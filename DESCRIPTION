@@ -1,0 +1,17 @@
+Package: loomR
+Type: Package
+Title: An R interface for loom files
+Version: 0.1.0
+Authors@R: c(
+  person(given = 'Paul', family = 'Hoffman', email = 'phoffman@nygenome.org', role = c('aut', 'cre'))
+  )
+Description: More about what it does (maybe more than one line)
+Imports:
+  methods,
+  h5
+Collate:
+  'loom.R'
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
