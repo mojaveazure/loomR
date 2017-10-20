@@ -2,4 +2,8 @@
 
 exportClasses(loom)
 import(h5)
-import(methods)
+importFrom(methods,callNextMethod)
+importFrom(methods,setClass)
+importFrom(methods,setGeneric)
+importFrom(methods,setMethod)
+importFrom(utils,packageVersion)
