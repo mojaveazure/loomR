@@ -1,4 +1,4 @@
-#' @import Methods
+#' @import methods
 #' @import h5
 NULL
 
