@@ -1,4 +1,15 @@
+# Ignore R stuff
+################
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# Ignore system files and directories
+#####################################
+.vscode/
+.DS_Store
+
+# Ignore loom files
+###################
+*.loom
