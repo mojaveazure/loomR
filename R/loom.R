@@ -4,6 +4,9 @@ NULL
 
 #' A class for loom
 #'
+#' @slot shape The shape of /matrix
+#' @slot version The version of loomR that this object was made under
+#'
 #' @name loom-class
 #' @rdname loom-class
 #' @exportClass loom
@@ -12,9 +15,9 @@ loom <- setClass(
   Class = 'loom',
   #i'm not sure what we should store as slots, and what we should store as attributes or groups
   slots = c(
-    version = 'ANY',
-    filename = 'ANY',
-    shape = "vector"
+    # filename = 'ANY', # Already provided through H5File@location
+    shape = 'vector',
+    version = 'ANY'
   ),
   contains = 'H5File'
 )
@@ -30,7 +33,10 @@ setMethod(
       name = name,
       mode = mode
     )
+    validateLoom(object = .Object)
     #.Object@version <- packageVersion(pkg = 'loom')
+    # .Object@filename <- name
+    .Object@shape <- dim(.Object['/matrix'])
     return(.Object)
   }
 )
@@ -39,7 +45,7 @@ setMethod(
 #'
 #' @param object A loom object
 #'
-#' @return TRUE if a valid loom object
+#' @return None, errors if object is an invalid loom object
 #'
 validateLoom <- function(object) {
   # A loom file is a specific HDF5
@@ -51,9 +57,10 @@ validateLoom <- function(object) {
   if (root.datasets != '/matrix') {
     stop("The root dataset must be called '/matrix'")
   }
-  dim.matrix <- object[root.datasets]@dim # Rows x Columns
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
-  required.groups <- c('/col_attrs', '/row_attrs', '/layers')
+  required.groups <- c('/row_attrs', '/col_attrs', '/layers')
+  dim.matrix <- object[root.datasets]@dim # Rows x Columns
+  names(dim.matrix) <- required.groups[1:2]
   root.groups <- list.groups(.Object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
     "There can only be three groups in the loom file: '",
@@ -66,25 +73,32 @@ validateLoom <- function(object) {
   if (!all(required.groups %in% root.groups)) {
     stop(group.msg)
   }
-  vapply(
+  unlist(x = sapply(
     X = required.groups[1:2],
     FUN = function(group) {
-      if (length(x = list.groups(.Object = object, path = group, recursive = FALSE)) > 0) {
+      if (length(x = list.groups(.Object = object[group], recursive = FALSE)) > 0) {
         stop(paste("Group", group, "cannot have subgroups"))
       }
       if (length(x = list.attributes(.Object = object[group])) > 0) {
         stop(paste("Group", group, "cannot have subattributes"))
       }
-      for (dataset in list.datasets(.Object = object, path = group)) {
-        break
+      for (dataset in list.datasets(.Object = object[group])) {
+        if (object[dataset]@dim != dim.matrix[group]) {
+          stop(paste("All datasets in group", group, "must be of length", required.groups[group]))
+        }
       }
     }
-  )
+  ))
+  for (dataset in list.datasets(.Object = object['/layers'])) {
+    if (any(object[dataset]@dim != dim.matrix)) {
+      stop(paste("All datasets in '/layers' must be", dim.matrix[1], 'by', dim.matrix[2]))
+    }
+  }
 }
 
 connect = function(filename, mode = "r+") {
   self <- new("loom", filename, mode)
-  self@filename <- filename
+  # self@filename <- filename
   self@shape = dim(self["matrix"])
   return(self)
 }
@@ -114,10 +128,10 @@ map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, select
         new_results <- apply(chunk, 1, FUN = f_list[[j]])
         results[[j]] <- c(results[[j]], new_results)
       }
-      ix <- ix + chunksize 
+      ix <- ix + chunksize
     }
   }
-  
+
   if (MARGIN==2) {
     results=list();
     for (j in 1:n_func) {
@@ -132,9 +146,9 @@ map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, select
         new_results <- apply(chunk, 2, FUN = f_list[[j]])
         results[[j]] <- c(results[[j]], new_results)
       }
-      ix <- ix + chunksize 
+      ix <- ix + chunksize
     }
-  }  
+  }
   if (n_func == 1) return(results[[1]])
   return(results)
 }

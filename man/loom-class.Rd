@@ -8,3 +8,9 @@
 \description{
 A class for loom
 }
+\section{Slots}{
+
+\describe{
+\item{\code{}}{}
+}}
+
