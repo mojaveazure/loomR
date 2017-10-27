@@ -5,14 +5,17 @@
 \alias{loom-class}
 \alias{loom}
 \title{A class for loom}
+\format{An object of class \code{R6ClassGenerator} of length 24.}
+\usage{
+loom
+}
+\value{
+Object of class \code{\link{loom}}
+}
 \description{
 A class for loom
 }
-\section{Slots}{
-
-\describe{
-\item{\code{shape}}{The shape of /matrix}
-
-\item{\code{version}}{The version of loomR that this object was made under}
-}}
-
+\seealso{
+\code{\link{hdf5r::H5File}}
+}
+\keyword{datasets}

@@ -1,45 +1,63 @@
-#' @import h5
-#' @importFrom methods setClass setMethod setGeneric callNextMethod
+#' @import hdf5r
+#' @importFrom R6 R6Class
 NULL
 
 #' A class for loom
 #'
-#' @slot shape The shape of /matrix
-#' @slot version The version of loomR that this object was made under
-#'
+#' @docType class
 #' @name loom-class
 #' @rdname loom-class
-#' @exportClass loom
+#' @return Object of class \code{\link{loom}}
+#' @seealso \code{\link{hdf5r::H5File}}
 #'
-loom <- setClass(
-  Class = 'loom',
-  #i'm not sure what we should store as slots, and what we should store as attributes or groups
-  slots = c(
-    # filename = 'ANY', # Already provided through H5File@location
-    shape = 'vector',
-    version = 'ANY'
-  ),
-  contains = 'H5File'
+#' @export
+#'
+loom <- R6Class(
+  classname = 'loom',
+  inherit = hdf5r::H5File,
+  cloneable = FALSE,
+  portable = TRUE,
+  lock_class = TRUE,
+  public = list(
+    # Fields
+    version = NULL,
+    # Methods
+    initialize = function(
+      filename = NULL,
+      mode = c('a', 'r', 'r+'),
+      ...
+    ) {
+      do.validate <- file.exists(filename)
+      super$initialize(filename = filename, mode = mode, ...)
+      # if (do.validate) {
+      #   validateLoom(object = self)
+      # } else {
+      #   # self$version <- packageVersion(pkg = 'loom')
+      #   print()
+      # }
+    }
+  )
 )
 
-#' @importFrom utils packageVersion
-#'
-setMethod(
-  f = 'initialize',
-  signature = 'loom',
-  definition = function(.Object, name, mode = 'a') {
-    .Object <- callNextMethod(
-      .Object,
-      name = name,
-      mode = mode
-    )
-    validateLoom(object = .Object)
-    #.Object@version <- packageVersion(pkg = 'loom')
-    # .Object@filename <- name
-    .Object@shape <- dim(.Object['/matrix'])
-    return(.Object)
-  }
-)
+# #' @importFrom utils packageVersion
+# #'
+# setMethod(
+#   f = 'initialize',
+#   signature = 'loom',
+#   definition = function(.Object, name, mode = 'a') {
+#     .Object <- callNextMethod(
+#       .Object,
+#       name = name,
+#       mode = mode
+#     )
+#     validateLoom(object = .Object)
+#     #.Object@version <- packageVersion(pkg = 'loom')
+#     # .Object@filename <- name
+#     .Object@shape <- dim(.Object['/matrix'])
+#     return(.Object)
+#   }
+# )
+
 
 #' Validate a loom object
 #'
@@ -50,18 +68,18 @@ setMethod(
 validateLoom <- function(object) {
   # A loom file is a specific HDF5
   # We need a dataset in /matrix that's a two-dimensional dense matrix
-  root.datasets <- list.datasets(.Object = object, path = '/', recursive = FALSE)
+  root.datasets <- list.datasets(object = object, path = '/', recursive = FALSE)
   if (length(x = root.datasets) != 1) {
     stop("There can only be one dataset at the root of the loom file")
   }
-  if (root.datasets != '/matrix') {
+  if (root.datasets != 'matrix') {
     stop("The root dataset must be called '/matrix'")
   }
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
-  required.groups <- c('/row_attrs', '/col_attrs', '/layers')
-  dim.matrix <- object[root.datasets]@dim # Rows x Columns
-  names(dim.matrix) <- required.groups[1:2]
-  root.groups <- list.groups(.Object = object, path = '/', recursive = FALSE)
+  required.groups <- c('row_attrs', 'col_attrs', 'layers')
+  dim.matrix <- object[[root.datasets]]$dims # Rows x Columns
+  names(dim.matrix) <- required.groups[c(2, 1)]
+  root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
     "There can only be three groups in the loom file: '",
     paste(required.groups, collapse = "', '"),
@@ -76,21 +94,21 @@ validateLoom <- function(object) {
   unlist(x = sapply(
     X = required.groups[1:2],
     FUN = function(group) {
-      if (length(x = list.groups(.Object = object[group], recursive = FALSE)) > 0) {
+      if (length(x = list.groups(object = object[[group]], recursive = FALSE)) > 0) {
         stop(paste("Group", group, "cannot have subgroups"))
       }
-      if (length(x = list.attributes(.Object = object[group])) > 0) {
+      if (length(x = list.attributes(object = object[[group]])) > 0) {
         stop(paste("Group", group, "cannot have subattributes"))
       }
-      for (dataset in list.datasets(.Object = object[group])) {
-        if (object[dataset]@dim != dim.matrix[group]) {
+      for (dataset in list.datasets(object = object[[group]])) {
+        if (object[[paste(group, dataset, sep = '/')]]$dims != dim.matrix[group]) {
           stop(paste("All datasets in group", group, "must be of length", required.groups[group]))
         }
       }
     }
   ))
-  for (dataset in list.datasets(.Object = object['/layers'])) {
-    if (any(object[dataset]@dim != dim.matrix)) {
+  for (dataset in list.datasets(object = object[['/layers']])) {
+    if (any(object[[paste('layers', dataset, sep = '/')]]$dims != dim.matrix)) {
       stop(paste("All datasets in '/layers' must be", dim.matrix[1], 'by', dim.matrix[2]))
     }
   }
