@@ -4,7 +4,7 @@
 \alias{connect}
 \title{Connect to a loom file}
 \usage{
-connect(filename, mode = "r+")
+connect(filename, mode = "r")
 }
 \arguments{
 \item{filename}{The loom file to connect to}
