@@ -2,5 +2,7 @@
 
 export(connect)
 export(loom)
+export(validateLoom)
 import(hdf5r)
 importFrom(R6,R6Class)
+importFrom(utils,packageVersion)

@@ -10,6 +10,8 @@ NULL
 #' @return Object of class \code{\link{loom}}
 #' @seealso \code{\link{hdf5r::H5File}}
 #'
+#' @importFrom utils packageVersion
+#'
 #' @export
 #'
 loom <- R6Class(
@@ -21,6 +23,8 @@ loom <- R6Class(
   public = list(
     # Fields
     version = NULL,
+    shape = NULL,
+    chunksize = NULL,
     # Methods
     initialize = function(
       filename = NULL,
@@ -29,15 +33,43 @@ loom <- R6Class(
     ) {
       do.validate <- file.exists(filename)
       super$initialize(filename = filename, mode = mode, ...)
-      # if (do.validate) {
-      #   validateLoom(object = self)
-      # } else {
-      #   # self$version <- packageVersion(pkg = 'loom')
-      #   print()
-      # }
+      if (do.validate) {
+        validateLoom(object = self)
+        self$shape <- self[['matrix']]$dims
+        chunks <- h5attr(x = self, which = 'chunks')
+        chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
+        chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
+        chunks <- unlist(x = strsplit(x = chunks, split = ','))
+        self$chunks <- as.integer(x = chunks)
+        self$version <- as.character(x = tryCatch(
+          expr = h5attr(x = self, which = 'version'),
+          error = function(e) packageVersion(pkg = 'loomR')
+        ))
+      } else {
+        # self$version <- packageVersion(pkg = 'loomR')
+        print()
+      }
     }
   )
 )
+
+#' Create a loom object
+#'
+#' @param filename ...
+#' @param data ...
+#' @param row.attrs ...
+#' @param col.attrs ...
+#'
+#' @return A connection to a loom file
+#'
+#' @seealso \code{\link{loom-class}}
+#'
+create <- function(filename, data, row.attrs, col.attrs) {
+  if (file.exists(filename)) {
+    stop(paste('File', file, 'already exists!'))
+  }
+  new.loom <- loom$new(filename = filename, mode = 'r')
+}
 
 # #' @importFrom utils packageVersion
 # #'
@@ -64,6 +96,8 @@ loom <- R6Class(
 #' @param object A loom object
 #'
 #' @return None, errors if object is an invalid loom object
+#'
+#' @export
 #'
 validateLoom <- function(object) {
   # A loom file is a specific HDF5
