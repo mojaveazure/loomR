@@ -25,30 +25,30 @@ loom <- R6Class(
     version = NULL,
     shape = NULL,
     chunksize = NULL,
+    matrix = NULL,
+    layers = NULL,
+    col.attrs = NULL,
+    row.attrs = NULL,
     # Methods
-    initialize = function(
-      filename = NULL,
-      mode = c('a', 'r', 'r+'),
-      ...
-    ) {
+    initialize = function(filename = NULL, mode = c('a', 'r', 'r+'), ...) {
       do.validate <- file.exists(filename)
       super$initialize(filename = filename, mode = mode, ...)
-      if (do.validate) {
-        validateLoom(object = self)
-        self$shape <- self[['matrix']]$dims
-        chunks <- h5attr(x = self, which = 'chunks')
-        chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunks <- as.integer(x = chunks)
-        self$version <- as.character(x = tryCatch(
-          expr = h5attr(x = self, which = 'version'),
-          error = function(e) packageVersion(pkg = 'loomR')
-        ))
-      } else {
-        # self$version <- packageVersion(pkg = 'loomR')
-        print()
-      }
+      # if (do.validate) {
+      #   validateLoom(object = self)
+      #   self$shape <- self[['matrix']]$dims
+      #   chunks <- h5attr(x = self, which = 'chunks')
+      #   chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
+      #   chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
+      #   chunks <- unlist(x = strsplit(x = chunks, split = ','))
+      #   self$chunks <- as.integer(x = chunks)
+      #   self$version <- as.character(x = tryCatch(
+      #     expr = h5attr(x = self, which = 'version'),
+      #     error = function(e) packageVersion(pkg = 'loomR')
+      #   ))
+      # } else {
+      #   # self$version <- packageVersion(pkg = 'loomR')
+      #   print()
+      # }
     }
   )
 )
@@ -59,16 +59,43 @@ loom <- R6Class(
 #' @param data ...
 #' @param row.attrs ...
 #' @param col.attrs ...
+#' @param chunk.dims ...
 #'
 #' @return A connection to a loom file
 #'
+#' @importFrom utils packageVersion
+#'
 #' @seealso \code{\link{loom-class}}
 #'
-create <- function(filename, data, row.attrs, col.attrs) {
+create <- function(
+  filename,
+  data,
+  row.attrs,
+  col.attrs,
+  chunk.dims = 'auto'
+) {
   if (file.exists(filename)) {
     stop(paste('File', file, 'already exists!'))
   }
+  if (!is.matrix(x = data)) {
+    data <- as.matrix(x = data)
+  }
+  if (length(x = chunk.dims) > 2 || length(x = chunk.dims < 1)) {
+    stop("'chunk.dims' must be a one- or two-length integer vector or 'auto'")
+  } else if (length(x = chunk.dims == 1)) {
+    if (!grepl(pattern = '^auto$', x = chunk.dims, perl = TRUE)) {
+      chunk.dims <- rep.int(x = as.integer(x = chunk.dims), times = 2)
+    }
+  } else {
+    chunk.dims <- as.integer(x = chunk.dims)
+  }
   new.loom <- loom$new(filename = filename, mode = 'r')
+  h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
+  new.loom$create_dataset(
+    name = 'matrix',
+    robj = data,
+    chunk_dims = chunk.dims
+  )
 }
 
 # #' @importFrom utils packageVersion
@@ -157,11 +184,9 @@ validateLoom <- function(object) {
 #'
 #' @export
 #'
-connect <- function(filename, mode = "r+") {
-  self <- new("loom", filename, mode)
-  # self@filename <- filename
-  self@shape <- self["matrix"]@dim
-  return(self)
+connect <- function(filename, mode = "r") {
+  new.loom <- loom$new(filename = filename, mode = mode)
+  return(new.loom)
 }
 
 #need to comment
@@ -173,18 +198,20 @@ connect <- function(filename, mode = "r+") {
 # nGene <- map(f, f_list = function(x) length(which(x>0)), MARGIN = 2)
 map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, selection) {
   n_func = length(f_list)
-  if (n_func == 1) f_list=list(f_list)
+  if (n_func == 1) {
+    f_list <- list(f_list)
+  }
   if (MARGIN == 1) {
-    results=list();
+    results <- list()
     for (j in 1:n_func) {
       results[[j]] <- numeric(0)
     }
     rows_per_chunk <- chunksize
     ix <- 1
     while (ix <= self@shape[1]) {
-      rows_per_chunk <- min(rows_per_chunk, self@shape[1]-ix+1)
-      chunk <- self["matrix"][ix:(ix + rows_per_chunk -1), ]
-      for(j in 1:n_func) {
+      rows_per_chunk <- min(rows_per_chunk, self@shape[1] - ix + 1)
+      chunk <- self["matrix"][ix:(ix + rows_per_chunk - 1), ]
+      for (j in 1:n_func) {
         new_results <- apply(chunk, 1, FUN = f_list[[j]])
         results[[j]] <- c(results[[j]], new_results)
       }
@@ -192,22 +219,24 @@ map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, select
     }
   }
   if (MARGIN == 2) {
-    results=list();
+    results <- list()
     for (j in 1:n_func) {
       results[[j]] <- numeric(0)
     }
     cols_per_chunk <- chunksize
     ix <- 1
     while (ix <= self@shape[2]) {
-      cols_per_chunk <- min(cols_per_chunk, self@shape[2]-ix+1)
-      chunk <- self["matrix"][,ix:(ix + cols_per_chunk -1)]
-      for(j in 1:n_func) {
+      cols_per_chunk <- min(cols_per_chunk, self@shape[2] - ix + 1)
+      chunk <- self["matrix"][, ix:(ix + cols_per_chunk - 1)]
+      for (j in 1:n_func) {
         new_results <- apply(chunk, 2, FUN = f_list[[j]])
         results[[j]] <- c(results[[j]], new_results)
       }
       ix <- ix + chunksize
     }
   }
-  if (n_func == 1) return(results[[1]])
+  if (n_func == 1) {
+    results <- results[[1]]
+  }
   return(results)
 }

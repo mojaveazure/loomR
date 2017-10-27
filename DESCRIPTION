@@ -3,12 +3,18 @@ Type: Package
 Title: An R interface for loom files
 Version: 0.1.0
 Authors@R: c(
-  person(given = 'Paul', family = 'Hoffman', email = 'phoffman@nygenome.org', role = c('aut', 'cre'))
+  person(given = 'Paul', family = 'Hoffman', email = 'phoffman@nygenome.org', role = c('aut', 'cre')),
+  person(given = 'Rahul', family = 'Satija', email = 'rsatija@nygenome.org', role = c('aut'))
   )
 Description: More about what it does (maybe more than one line)
+URL: https://github.com/mojaveazure/loomR
+BugReports: https://github.com/mojaveazure/loomR/issues
+Depends:
+  R (>= 3.2.2)
 Imports:
-  methods,
-  h5
+  R6,
+  hdf5r,
+  utils
 Collate:
   'loom.R'
 License: GPL-3

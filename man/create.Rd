@@ -4,16 +4,16 @@
 \alias{create}
 \title{Create a loom object}
 \usage{
-create(filename, data, row.attributes, col.attributes)
+create(filename, data, row.attrs, col.attrs)
 }
 \arguments{
 \item{filename}{...}
 
 \item{data}{...}
 
-\item{row.attributes}{...}
+\item{row.attrs}{...}
 
-\item{col.attributes}{...}
+\item{col.attrs}{...}
 }
 \value{
 A connection to a loom file
