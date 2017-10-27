@@ -4,7 +4,8 @@
 \alias{create}
 \title{Create a loom object}
 \usage{
-create(filename, data, row.attrs, col.attrs)
+create(filename, data, row.attrs = NULL, col.attrs = NULL, layers = NULL,
+  chunk.dims = "auto")
 }
 \arguments{
 \item{filename}{...}
@@ -14,6 +15,8 @@ create(filename, data, row.attrs, col.attrs)
 \item{row.attrs}{...}
 
 \item{col.attrs}{...}
+
+\item{chunk.dims}{...}
 }
 \value{
 A connection to a loom file

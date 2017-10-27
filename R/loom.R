@@ -30,25 +30,89 @@ loom <- R6Class(
     col.attrs = NULL,
     row.attrs = NULL,
     # Methods
-    initialize = function(filename = NULL, mode = c('a', 'r', 'r+'), ...) {
-      do.validate <- file.exists(filename)
+    initialize = function(filename = NULL, mode = c('a', 'r', 'r+', 'w', 'w+'), ...) {
+      # If the file exists, run validation steps
+      do.validate <- file.exists(filename) && !(mode %in% c('w', 'w+'))
       super$initialize(filename = filename, mode = mode, ...)
-      # if (do.validate) {
-      #   validateLoom(object = self)
-      #   self$shape <- self[['matrix']]$dims
-      #   chunks <- h5attr(x = self, which = 'chunks')
-      #   chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
-      #   chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
-      #   chunks <- unlist(x = strsplit(x = chunks, split = ','))
-      #   self$chunks <- as.integer(x = chunks)
-      #   self$version <- as.character(x = tryCatch(
-      #     expr = h5attr(x = self, which = 'version'),
-      #     error = function(e) packageVersion(pkg = 'loomR')
-      #   ))
-      # } else {
-      #   # self$version <- packageVersion(pkg = 'loomR')
-      #   print()
-      # }
+      if (do.validate) {
+        # Run the validation steps
+        validateLoom(object = self)
+        # Store the shape of /matrix
+        self$shape <- self[['matrix']]$dims
+        # Store the chunk size
+        chunks <- h5attr(x = self, which = 'chunks')
+        chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
+        chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
+        chunks <- unlist(x = strsplit(x = chunks, split = ','))
+        self$chunks <- as.integer(x = chunks)
+        # Store version information
+        self$version <- as.character(x = tryCatch(
+          # Try getting a version
+          # If it doesn't exist, can we write to the file?
+          # If so, store the version as this version of loomR
+          # Otherwise, store the version as NA_character_
+          expr = h5attr(x = self, which = 'version'),
+          error = function(e) {
+            if (mode != 'r') {
+              version <- packageVersion(pkg = 'loomR')
+              h5attr(x = self, which = 'version') <- version
+            } else {
+              version <- NA_character_
+            }
+            return(version)
+          }
+        ))
+        # Load layers
+        private$load_layers()
+        # Load attributes
+        private$load_attirubtes(MARGIN = 1)
+        private$load_attributes(MARGIN = 2)
+      } else {
+        # Assume new HDF5 file
+        self$version <- packageVersion(pkg = 'loomR')
+      }
+    },
+    add.layer = function(layer) {
+      invisible(x = NULL)
+    },
+    add.attribute = function(attribute, MARGIN = 1) {
+      invisible(x = NULL)
+    },
+    add.row.attribute = function(attribute) {
+      invisible(x = NULL)
+    },
+    add.col.attribute = function(attribute) {
+      invisible(x = NULL)
+    }
+  ),
+  private = list(
+    add_attribute = function(attribute, MARGIN) {
+      invisible(x = NULL)
+    },
+    load_attributes = function(MARGIN) {
+      attribute <- switch(
+        EXPR = MARGIN,
+        '1' = 'row_attrs',
+        '2' = 'col_attrs',
+        stop('Invalid attribute dimension')
+      )
+      group <- self[[attribute]]
+      attributes <- unlist(x = lapply(
+        X = names(x = group),
+        FUN = function(x) {
+          d <- list(group[[x]])
+          names(x = d) <- x
+          return(d)
+        }
+      ))
+      switch(
+        EXPR = MARGIN,
+        '1' = self$row.attrs <- attributes,
+        '2' = self$col.attrs <- attributes
+      )
+    },
+    load_layers = function() {
+      invisible(x = NULL)
     }
   )
 )
@@ -70,8 +134,9 @@ loom <- R6Class(
 create <- function(
   filename,
   data,
-  row.attrs,
-  col.attrs,
+  row.attrs = NULL,
+  col.attrs = NULL,
+  layers = NULL,
   chunk.dims = 'auto'
 ) {
   if (file.exists(filename)) {
@@ -96,6 +161,23 @@ create <- function(
     robj = data,
     chunk_dims = chunk.dims
   )
+  # Groups
+  new.loom$create_group(name = 'layers')
+  new.loom$create_group(name = 'row_attrs')
+  new.loom$create_group(name = 'col_attrs')
+  # Add layers
+  for (ly in layers) {
+    new.loom$add.layer(layer = ly)
+  }
+  for (rw in row.attrs) {
+    new.loom$add.row.attribute(attribute = rw)
+  }
+  for (cl in col.attrs) {
+    new.loom$add.col.attribute(attribute = cl)
+  }
+  # Set last bit of information
+  new.loom$shape <- ''
+  new.loom$chunksize <- ''
 }
 
 # #' @importFrom utils packageVersion
