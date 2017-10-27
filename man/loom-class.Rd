@@ -11,6 +11,8 @@ A class for loom
 \section{Slots}{
 
 \describe{
-\item{\code{}}{}
+\item{\code{shape}}{The shape of /matrix}
+
+\item{\code{version}}{The version of loomR that this object was made under}
 }}
 

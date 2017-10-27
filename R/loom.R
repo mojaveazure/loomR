@@ -96,13 +96,21 @@ validateLoom <- function(object) {
   }
 }
 
-connect = function(filename, mode = "r+") {
+#' Connect to a loom file
+#'
+#' @param filename The loom file to connect to
+#' @param mode How do we connect to it? Pass 'r' for read-only or 'r+' for read/write
+#'
+#' @return A loom file connection
+#'
+#' @export
+#'
+connect <- function(filename, mode = "r+") {
   self <- new("loom", filename, mode)
   # self@filename <- filename
-  self@shape = dim(self["matrix"])
+  self@shape <- self["matrix"]@dim
   return(self)
 }
-
 
 #need to comment
 #need to add progress bar
@@ -113,8 +121,8 @@ connect = function(filename, mode = "r+") {
 # nGene <- map(f, f_list = function(x) length(which(x>0)), MARGIN = 2)
 map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, selection) {
   n_func = length(f_list)
-  if (n_func==1) f_list=list(f_list)
-  if (MARGIN==1) {
+  if (n_func == 1) f_list=list(f_list)
+  if (MARGIN == 1) {
     results=list();
     for (j in 1:n_func) {
       results[[j]] <- numeric(0)
@@ -131,8 +139,7 @@ map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, select
       ix <- ix + chunksize
     }
   }
-
-  if (MARGIN==2) {
+  if (MARGIN == 2) {
     results=list();
     for (j in 1:n_func) {
       results[[j]] <- numeric(0)
