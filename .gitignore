@@ -13,3 +13,7 @@
 # Ignore loom files
 ###################
 *.loom
+
+# Ignore PDF files
+##################
+*.pdf
