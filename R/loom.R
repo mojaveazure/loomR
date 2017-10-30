@@ -30,7 +30,7 @@ loom <- R6Class(
     col.attrs = NULL,
     row.attrs = NULL,
     # Methods
-    initialize = function(filename = NULL, mode = c('a', 'r', 'r+', 'w', 'w+'), ...) {
+    initialize = function(filename = NULL, mode = c('a', 'r', 'r+', 'w', 'w-'), ...) {
       # If the file exists, run validation steps
       do.validate <- file.exists(filename) && !(mode %in% c('w', 'w+'))
       super$initialize(filename = filename, mode = mode, ...)
@@ -38,13 +38,13 @@ loom <- R6Class(
         # Run the validation steps
         validateLoom(object = self)
         # Store the shape of /matrix
-        self$shape <- self[['matrix']]$dims
+        self$shape <- rev(x = self[['matrix']]$dims)
         # Store the chunk size
         chunks <- h5attr(x = self, which = 'chunks')
         chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
         chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
         chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunks <- as.integer(x = chunks)
+        self$chunks <- rev(x = as.integer(x = chunks))
         # Store version information
         self$version <- as.character(x = tryCatch(
           # Try getting a version
@@ -72,23 +72,74 @@ loom <- R6Class(
         self$version <- packageVersion(pkg = 'loomR')
       }
     },
-    add.layer = function(layer) {
-      invisible(x = NULL)
+    add.layer = function(layer, name) {
+      if (!is.matrix(x = layer)) {
+        layer <- as.matrix(x = layer)
+      }
+      if (is.null(x = self$shape)) {
+        stop(private$err_msg)
+      }
+      if (dim(x = layer) != self$shape) {
+        stop(
+          paste(
+            "All layers must have a shape of",
+            paste(self$shape, collapse = ' by ')
+          )
+        )
+      }
+      self[['layers', name]] <- t(x = layer)
+      private$load_layers()
     },
-    add.attribute = function(attribute, MARGIN = 1) {
-      invisible(x = NULL)
+    add.attribute = function(attribute, MARGIN) {
+      # Value checking
+      if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
+        stop("'attribute' must be a named list")
+      }
+      if (length(x = attribute) > 1) {
+        for (i in attribute) {
+          if (!is.vector(x = attribute)) {
+            stop("All attributes must be one-dimensional vectors")
+          }
+        }
+      }
+      if (length(x = which(x = names(x = attribute) != '')) != length(x = attribute)) {
+        stop("Not all attributes had names provided")
+      }
+      if (!MARGIN %in% c(1, 2)) {
+        stop("'MARGIN' must be 1 or 2")
+      }
+      # Add the attributes as datasets for our MARGIN's group
+      if (is.null(x = self$shape)) {
+        stop(private$err_msg)
+      }
+      grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
+      grp <- self[[grp.name]]
+      for (i in 1:length(x = attribute)) {
+        if (length(attribute[i]) != self$shape[MARGIN])
+          stop(paste(
+            "All",
+            switch(EXPR = MARGIN, '1' = 'row', '2' = 'column'),
+            "attributes must be of length",
+            self$shape[MARGIN]
+          ))
+        grp[[names(x = attribute)[i]]] <- attribute[[i]]
+      }
+      gc(verbose = FALSE)
+      # Load the attributes for this margin
+      private$load_attributes(MARGIN = MARGIN)
     },
     add.row.attribute = function(attribute) {
-      invisible(x = NULL)
+      self$add.attribute(attribute = attribute, MARGIN = 1)
     },
     add.col.attribute = function(attribute) {
-      invisible(x = NULL)
+      self$add.attribute(attribute = attribute, MARGIN = 2)
+    },
+    add.meta.data = function(meta.data) {
+      self$add.col.attribute(attribute = meta.data)
     }
   ),
   private = list(
-    add_attribute = function(attribute, MARGIN) {
-      invisible(x = NULL)
-    },
+    err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these function to create or connect to a loom file",
     load_attributes = function(MARGIN) {
       attribute <- switch(
         EXPR = MARGIN,
@@ -154,11 +205,11 @@ create <- function(
   } else {
     chunk.dims <- as.integer(x = chunk.dims)
   }
-  new.loom <- loom$new(filename = filename, mode = 'r')
+  new.loom <- loom$new(filename = filename, mode = 'w-')
   h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
   new.loom$create_dataset(
     name = 'matrix',
-    robj = data,
+    robj = t(x = data),
     chunk_dims = chunk.dims
   )
   # Groups
@@ -178,6 +229,8 @@ create <- function(
   # Set last bit of information
   new.loom$shape <- ''
   new.loom$chunksize <- ''
+  # Return the connection
+  return(new.loom)
 }
 
 # #' @importFrom utils packageVersion
