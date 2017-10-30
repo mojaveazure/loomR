@@ -5,16 +5,45 @@
 \alias{loom-class}
 \alias{loom}
 \title{A class for loom}
-\format{An object of class \code{R6ClassGenerator} of length 24.}
+\format{An \code{\link{R6Class}} object}
 \usage{
 loom
 }
 \value{
-Object of class \code{\link{loom}}
+Object of \code{\link{R6Class}} to generate \code{loom} objects
 }
 \description{
 A class for loom
 }
+\section{Fields}{
+
+\describe{
+\item{\code{version}}{Version of loomR object was created under}
+
+\item{\code{shape}}{Shape of \code{/matrix} in columns (cells) by rows (genes)}
+
+\item{\code{chunksize}}{Chunks set for this dataset in columns (cells) by rows (genes)}
+
+\item{\code{matrix}}{The main data matrix, stored as columns (cells) by rows (genes)}
+
+\item{\code{layers}}{Additional data matricies, the same shape as \code{/matrix}}
+
+\item{\code{col.attrs}}{Extra information about cells}
+
+\item{\code{row.attrs}}{Extra information about genes}
+}}
+
+\section{Methods}{
+
+\describe{
+  \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
+  \item{\code{add.attribute(attribute, MARGIN)}}{Add extra information to this loom file; \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix}, \code{MARGIN} is either 1 for cells or 2 for genes}
+  \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
+  \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+  \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+}
+}
+
 \seealso{
 \code{\link{hdf5r::H5File}}
 }
