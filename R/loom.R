@@ -33,11 +33,18 @@ NULL
 #' @export
 #'
 loom <- R6Class(
+  # The loom class
+  # Based on the H5File class from hdf5r
+  # Not clonable (no loom$clone method), doesn't make sense since all data is on disk, not in memory
+  # Yes to portability, other packages can subclass the loom class
+  # Class is locked, other fields and methods cannot be added
   classname = 'loom',
   inherit = hdf5r::H5File,
   cloneable = FALSE,
   portable = TRUE,
   lock_class = TRUE,
+  # Public fields and methods
+  # See above for documentation
   public = list(
     # Fields
     version = NULL,
@@ -87,7 +94,7 @@ loom <- R6Class(
         private$load_attributes(MARGIN = 2) # Genes (row_attrs)
       } else {
         # Assume new HDF5 file
-        self$version <- packageVersion(pkg = 'loomR')
+        self$version <- as.character(x = packageVersion(pkg = 'loomR'))
       }
     },
     add.layer = function(layer, name) {
@@ -118,6 +125,7 @@ loom <- R6Class(
       } else {
         self[[layers, name]] <- layer
       }
+      self$flush()
       private$load_layers()
     },
     add.attribute = function(attribute, MARGIN) {
@@ -145,31 +153,43 @@ loom <- R6Class(
       grp.name <- c('col_attrs', 'row_attrs')[MARGIN]
       grp <- self[[grp.name]]
       for (i in 1:length(x = attribute)) {
-        if (length(attribute[i]) != self$shape[MARGIN])
+        if (length(attribute[[i]]) != self$shape[MARGIN])
           stop(paste(
             "All",
-            switch(EXPR = MARGIN, '1' = 'row', '2' = 'column'),
+            switch(EXPR = MARGIN, '1' = 'cell', '2' = 'gene'),
             "attributes must be of length",
             self$shape[MARGIN]
           ))
         grp[[names(x = attribute)[i]]] <- attribute[[i]]
       }
+      self$flush()
       gc(verbose = FALSE)
       # Load the attributes for this margin
       private$load_attributes(MARGIN = MARGIN)
     },
+    # Add attributes for genes
     add.row.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 2)
     },
+    # Add attributes for cells
     add.col.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 1)
     },
+    # Add metadata, follows cells
     add.meta.data = function(meta.data) {
       self$add.col.attribute(attribute = meta.data)
     }
   ),
+  # Private fields and methods
+  # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
+  # \describe{
+  #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
+  #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
+  # }
   private = list(
+    # Fields
     err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these function to create or connect to a loom file",
+    # Methods
     load_attributes = function(MARGIN) {
       attribute <- switch(
         EXPR = MARGIN,
@@ -233,7 +253,7 @@ create <- function(
   if (!is.matrix(x = data)) {
     data <- as.matrix(x = data)
   }
-  if (length(x = chunk.dims) > 2 || length(x = chunk.dims < 1)) {
+  if (length(x = chunk.dims) > 2 || length(x = chunk.dims) < 1) {
     stop("'chunk.dims' must be a one- or two-length integer vector or 'auto'")
   } else if (length(x = chunk.dims == 1)) {
     if (!grepl(pattern = '^auto$', x = chunk.dims, perl = TRUE)) {
@@ -249,6 +269,7 @@ create <- function(
     robj = t(x = data),
     chunk_dims = chunk.dims
   )
+  new.loom$shape <- new.loom[['matrix']]$dims
   if (!is.null(x = colnames(x = data))) {
     new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
   }
@@ -270,10 +291,13 @@ create <- function(
   for (ly in layers) {
     new.loom$add.layer(layer = ly)
   }
-  new.loom$add.row.attribute(attribute = gene.attrs)
-  new.loom$add.col.attribute(attribute = cell.attrs)
+  if (!is.null(x = gene.attrs)) {
+    new.loom$add.row.attribute(attribute = gene.attrs)
+  }
+  if (!is.null(x = cell.attrs)) {
+    new.loom$add.col.attribute(attribute = cell.attrs)
+  }
   # Set last bit of information
-  new.loom$shape <- new.loom[['matrix']]$dims
   chunks <- new.loom[['matrix']]$chunk_dims
   chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
   chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
