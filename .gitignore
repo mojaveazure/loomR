@@ -10,9 +10,10 @@
 .vscode/
 .DS_Store
 
-# Ignore loom files
-###################
+# Ignore loom and HDF5 files
+############################
 *.loom
+*.h5
 
 # Ignore PDF files
 ##################
