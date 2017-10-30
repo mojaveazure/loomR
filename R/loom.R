@@ -2,13 +2,31 @@
 #' @importFrom R6 R6Class
 NULL
 
-#' A class for loom
+#' A class for loom files
 #'
 #' @docType class
 #' @name loom-class
 #' @rdname loom-class
-#' @return Object of class \code{\link{loom}}
+#' @return Object of \code{\link{R6Class}} to generate \code{loom} objects
+#' @format An \code{\link{R6Class}} object
 #' @seealso \code{\link{hdf5r::H5File}}
+#'
+#' @field version Version of loomR object was created under
+#' @field shape Shape of \code{/matrix} in columns (cells) by rows (genes)
+#' @field chunksize Chunks set for this dataset in columns (cells) by rows (genes)
+#' @field matrix The main data matrix, stored as columns (cells) by rows (genes)
+#' @field layers Additional data matricies, the same shape as \code{/matrix}
+#' @field col.attrs Extra information about cells
+#' @field row.attrs Extra information about genes
+#'
+#' @section Methods:
+#' \describe{
+#'   \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
+#'   \item{\code{add.attribute(attribute, MARGIN)}}{Add extra information to this loom file; \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix}, \code{MARGIN} is either 1 for cells or 2 for genes}
+#'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
+#'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+#'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+#' }
 #'
 #' @importFrom utils packageVersion
 #'
@@ -44,7 +62,7 @@ loom <- R6Class(
         chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
         chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
         chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunks <- rev(x = as.integer(x = chunks))
+        self$chunks <- as.integer(x = chunks)
         # Store version information
         self$version <- as.character(x = tryCatch(
           # Try getting a version
@@ -65,29 +83,41 @@ loom <- R6Class(
         # Load layers
         private$load_layers()
         # Load attributes
-        private$load_attirubtes(MARGIN = 1)
-        private$load_attributes(MARGIN = 2)
+        private$load_attirubtes(MARGIN = 1) # Column
+        private$load_attributes(MARGIN = 2) # Row
       } else {
         # Assume new HDF5 file
         self$version <- packageVersion(pkg = 'loomR')
       }
     },
     add.layer = function(layer, name) {
+      # Layers have to be matricies
       if (!is.matrix(x = layer)) {
         layer <- as.matrix(x = layer)
       }
       if (is.null(x = self$shape)) {
         stop(private$err_msg)
       }
-      if (dim(x = layer) != self$shape) {
-        stop(
-          paste(
-            "All layers must have a shape of",
-            paste(self$shape, collapse = ' by ')
-          )
-        )
+      do.transpose <- FALSE
+      if (any(dim(x = layer) != self$shape)) {
+        if (all(rev(x = dim(x = layer)) == self$shape)) {
+          do.transpose <- TRUE
+        } else {
+          stop(paste(
+            "All layers must have",
+            self$shape[1],
+            "rows for cells and",
+            self$shape[2],
+            "columns for genes"
+          ))
+        }
       }
-      self[['layers', name]] <- t(x = layer)
+      # Transpose the matrix since hdf5r uses column x row
+      if (do.transpose) {
+        self[['layers', name]] <- t(x = layer)
+      } else {
+        self[[layers, name]] <- layer
+      }
       private$load_layers()
     },
     add.attribute = function(attribute, MARGIN) {
@@ -112,7 +142,7 @@ loom <- R6Class(
       if (is.null(x = self$shape)) {
         stop(private$err_msg)
       }
-      grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
+      grp.name <- c('col_attrs', 'row_attrs')[MARGIN]
       grp <- self[[grp.name]]
       for (i in 1:length(x = attribute)) {
         if (length(attribute[i]) != self$shape[MARGIN])
@@ -129,10 +159,10 @@ loom <- R6Class(
       private$load_attributes(MARGIN = MARGIN)
     },
     add.row.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 1)
+      self$add.attribute(attribute = attribute, MARGIN = 2)
     },
     add.col.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 2)
+      self$add.attribute(attribute = attribute, MARGIN = 1)
     },
     add.meta.data = function(meta.data) {
       self$add.col.attribute(attribute = meta.data)
@@ -143,8 +173,8 @@ loom <- R6Class(
     load_attributes = function(MARGIN) {
       attribute <- switch(
         EXPR = MARGIN,
-        '1' = 'row_attrs',
-        '2' = 'col_attrs',
+        '1' = 'col_attrs',
+        '2' = 'row_attrs',
         stop('Invalid attribute dimension')
       )
       group <- self[[attribute]]
@@ -156,14 +186,21 @@ loom <- R6Class(
           return(d)
         }
       ))
-      switch(
-        EXPR = MARGIN,
-        '1' = self$row.attrs <- attributes,
-        '2' = self$col.attrs <- attributes
-      )
+      if (MARGIN == 1) {
+        self$row.attrs <- attributes
+      } else if (MARGIN == 2) {
+        self$col.attrs <- attributes
+      }
     },
     load_layers = function() {
-      invisible(x = NULL)
+      self$layers <- unlist(x = lapply(
+        X = names(x = self[[layers]]),
+        FUN = function(n) {
+          d <- c(self[[layers, n]])
+          names(x = d) <- n
+          return(d)
+        }
+      ))
     }
   )
 )
@@ -206,11 +243,24 @@ create <- function(
     chunk.dims <- as.integer(x = chunk.dims)
   }
   new.loom <- loom$new(filename = filename, mode = 'w-')
-  h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
+  # Create the matrix
   new.loom$create_dataset(
     name = 'matrix',
     robj = t(x = data),
     chunk_dims = chunk.dims
+  )
+  if (!is.null(x = colnames(x = data))) {
+    new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
+  }
+  if (!is.null(x = rownames(x = data))) {
+    new.loom$add.col.attribute(attribute = list('cell_names' = colnames(x = data)))
+  }
+  # Set some constants as attributes
+  h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
+  h5attr(x = new.loom, which = 'chunks') <- paste0(
+    '(',
+    paste(new.loom[['matrix']]$chunks, collapse = ', '),
+    ')'
   )
   # Groups
   new.loom$create_group(name = 'layers')
@@ -220,12 +270,8 @@ create <- function(
   for (ly in layers) {
     new.loom$add.layer(layer = ly)
   }
-  for (rw in row.attrs) {
-    new.loom$add.row.attribute(attribute = rw)
-  }
-  for (cl in col.attrs) {
-    new.loom$add.col.attribute(attribute = cl)
-  }
+  new.loom$add.row.attribute(attribute = row.attrs)
+  new.loom$add.col.attribute(attribute = col.attrs)
   # Set last bit of information
   new.loom$shape <- ''
   new.loom$chunksize <- ''
@@ -233,31 +279,11 @@ create <- function(
   return(new.loom)
 }
 
-# #' @importFrom utils packageVersion
-# #'
-# setMethod(
-#   f = 'initialize',
-#   signature = 'loom',
-#   definition = function(.Object, name, mode = 'a') {
-#     .Object <- callNextMethod(
-#       .Object,
-#       name = name,
-#       mode = mode
-#     )
-#     validateLoom(object = .Object)
-#     #.Object@version <- packageVersion(pkg = 'loom')
-#     # .Object@filename <- name
-#     .Object@shape <- dim(.Object['/matrix'])
-#     return(.Object)
-#   }
-# )
-
-
 #' Validate a loom object
 #'
 #' @param object A loom object
 #'
-#' @return None, errors if object is an invalid loom object
+#' @return None, errors if object is an invalid loom connection
 #'
 #' @export
 #'
