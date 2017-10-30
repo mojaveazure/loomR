@@ -10,7 +10,7 @@ validateLoom(object)
 \item{object}{A loom object}
 }
 \value{
-None, errors if object is an invalid loom object
+None, errors if object is an invalid loom connection
 }
 \description{
 Validate a loom object

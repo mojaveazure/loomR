@@ -83,8 +83,8 @@ loom <- R6Class(
         # Load layers
         private$load_layers()
         # Load attributes
-        private$load_attirubtes(MARGIN = 1) # Column
-        private$load_attributes(MARGIN = 2) # Row
+        private$load_attirubtes(MARGIN = 1) # Cells (col_attrs)
+        private$load_attributes(MARGIN = 2) # Genes (row_attrs)
       } else {
         # Assume new HDF5 file
         self$version <- packageVersion(pkg = 'loomR')
@@ -207,11 +207,11 @@ loom <- R6Class(
 
 #' Create a loom object
 #'
-#' @param filename ...
-#' @param data ...
-#' @param row.attrs ...
-#' @param col.attrs ...
-#' @param chunk.dims ...
+#' @param filename The name of the new loom file
+#' @param data The data for \code{/matrix}, should be cells as rows and genes as columns
+#' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
+#' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
+#' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
 #'
 #' @return A connection to a loom file
 #'
@@ -222,8 +222,8 @@ loom <- R6Class(
 create <- function(
   filename,
   data,
-  row.attrs = NULL,
-  col.attrs = NULL,
+  gene.attrs = NULL,
+  cell.attrs = NULL,
   layers = NULL,
   chunk.dims = 'auto'
 ) {
@@ -259,7 +259,7 @@ create <- function(
   h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
   h5attr(x = new.loom, which = 'chunks') <- paste0(
     '(',
-    paste(new.loom[['matrix']]$chunks, collapse = ', '),
+    paste(new.loom[['matrix']]$chunk_dims, collapse = ', '),
     ')'
   )
   # Groups
@@ -270,11 +270,15 @@ create <- function(
   for (ly in layers) {
     new.loom$add.layer(layer = ly)
   }
-  new.loom$add.row.attribute(attribute = row.attrs)
-  new.loom$add.col.attribute(attribute = col.attrs)
+  new.loom$add.row.attribute(attribute = gene.attrs)
+  new.loom$add.col.attribute(attribute = cell.attrs)
   # Set last bit of information
-  new.loom$shape <- ''
-  new.loom$chunksize <- ''
+  new.loom$shape <- new.loom[['matrix']]$dims
+  chunks <- new.loom[['matrix']]$chunk_dims
+  chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
+  chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
+  chunks <- unlist(x = strsplit(x = chunks, split = ','))
+  new.loom$chunksize <- as.integer(x = chunks)
   # Return the connection
   return(new.loom)
 }

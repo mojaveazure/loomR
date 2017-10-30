@@ -4,7 +4,7 @@
 \name{loom-class}
 \alias{loom-class}
 \alias{loom}
-\title{A class for loom}
+\title{A class for loom files}
 \format{An \code{\link{R6Class}} object}
 \usage{
 loom
@@ -13,7 +13,7 @@ loom
 Object of \code{\link{R6Class}} to generate \code{loom} objects
 }
 \description{
-A class for loom
+A class for loom files
 }
 \section{Fields}{
 

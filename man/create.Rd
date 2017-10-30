@@ -4,19 +4,19 @@
 \alias{create}
 \title{Create a loom object}
 \usage{
-create(filename, data, row.attrs = NULL, col.attrs = NULL, layers = NULL,
-  chunk.dims = "auto")
+create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
+  layers = NULL, chunk.dims = "auto")
 }
 \arguments{
-\item{filename}{...}
+\item{filename}{The name of the new loom file}
 
-\item{data}{...}
+\item{data}{The data for \code{/matrix}, should be cells as rows and genes as columns}
 
-\item{row.attrs}{...}
+\item{gene.attrs}{A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}}
 
-\item{col.attrs}{...}
+\item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}}
 
-\item{chunk.dims}{...}
+\item{chunk.dims}{A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize}
 }
 \value{
 A connection to a loom file
