@@ -56,13 +56,13 @@ loom <- R6Class(
         # Run the validation steps
         validateLoom(object = self)
         # Store the shape of /matrix
-        self$shape <- rev(x = self[['matrix']]$dims)
+        self$shape <- self[['matrix']]$dims
         # Store the chunk size
         chunks <- h5attr(x = self, which = 'chunks')
         chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
         chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
         chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunks <- as.integer(x = chunks)
+        self$chunksize <- as.integer(x = chunks)
         # Store version information
         self$version <- as.character(x = tryCatch(
           # Try getting a version
@@ -83,7 +83,7 @@ loom <- R6Class(
         # Load layers
         private$load_layers()
         # Load attributes
-        private$load_attirubtes(MARGIN = 1) # Cells (col_attrs)
+        private$load_attributes(MARGIN = 1) # Cells (col_attrs)
         private$load_attributes(MARGIN = 2) # Genes (row_attrs)
       } else {
         # Assume new HDF5 file
@@ -187,16 +187,16 @@ loom <- R6Class(
         }
       ))
       if (MARGIN == 1) {
-        self$row.attrs <- attributes
-      } else if (MARGIN == 2) {
         self$col.attrs <- attributes
+      } else if (MARGIN == 2) {
+        self$row.attrs <- attributes
       }
     },
     load_layers = function() {
       self$layers <- unlist(x = lapply(
-        X = names(x = self[[layers]]),
+        X = names(x = self[['layers']]),
         FUN = function(n) {
-          d <- c(self[[layers, n]])
+          d <- c(self[['layers', n]])
           names(x = d) <- n
           return(d)
         }
@@ -255,8 +255,8 @@ create <- function(
   if (!is.null(x = rownames(x = data))) {
     new.loom$add.col.attribute(attribute = list('cell_names' = colnames(x = data)))
   }
-  # Set some constants as attributes
-  h5attr(x = new.loom, which = 'version') <- as.character(x = packageVersion(pkg = 'loomR'))
+  # Store some constants as HDF5 attributes
+  h5attr(x = new.loom, which = 'version') <- new.loom$version
   h5attr(x = new.loom, which = 'chunks') <- paste0(
     '(',
     paste(new.loom[['matrix']]$chunk_dims, collapse = ', '),
@@ -304,7 +304,7 @@ validateLoom <- function(object) {
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
   required.groups <- c('row_attrs', 'col_attrs', 'layers')
   dim.matrix <- object[[root.datasets]]$dims # Rows x Columns
-  names(dim.matrix) <- required.groups[c(2, 1)]
+  names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
     "There can only be three groups in the loom file: '",
@@ -350,6 +350,9 @@ validateLoom <- function(object) {
 #' @export
 #'
 connect <- function(filename, mode = "r") {
+  if (!(mode %in% c('r', 'r+'))) {
+    stop("'mode' must be one of 'r' or 'r+'")
+  }
   new.loom <- loom$new(filename = filename, mode = mode)
   return(new.loom)
 }
