@@ -22,13 +22,27 @@ NULL
 #' @section Methods:
 #' \describe{
 #'   \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
-#'   \item{\code{add.attribute(attribute, MARGIN)}}{Add extra information to this loom file; \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix}, \code{MARGIN} is either 1 for cells or 2 for genes}
+#'   \item{\code{add.attribute(attribute, MARGIN)}}{
+#'     Add extra information to this loom file where
+#'     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
+#'     \code{MARGIN} is either 1 for cells or 2 for genes
+#'   }
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}}{
+#'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
+#'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
+#'     If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.
+#'     Otherwise, pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes.
+#'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
+#'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
+#'   }
 #' }
 #'
+#' @importFrom iterators nextElem
 #' @importFrom utils packageVersion
+#' @importFrom itertools ihasNext ichunk hasNext
 #'
 #' @export
 #'
@@ -189,6 +203,65 @@ loom <- R6Class(
     add.meta.data = function(meta.data) {
       self$add.col.attribute(attribute = meta.data)
       invisible(x = self)
+    },
+    # Batch scan
+    batch.scan = function(
+      chunk.size = NULL,
+      MARGIN = 1,
+      index.use = NULL,
+      dataset.use = 'matrix'
+    ) {
+      if (is.null(x = private$it) || !grepl(pattern = dataset.use, x = private$iter.dataset)) {
+        # Check the existence of the dataset
+        private$iter.dataset <- grep(
+          pattern = dataset.use,
+          x = list.datasets(object = self),
+          value = TRUE
+        )
+        if (length(x = private$iter.dataset) != 1) {
+          stop(paste0("Cannot find dataset '", dataset.use, "' in the loom file"))
+        }
+        # Check the margin
+        if (!(MARGIN %in% c(1, 2))) {
+          stop("MARGIN must be 1 (cells) or 2 (genes)")
+        } else {
+          private$iter.margin <- MARGIN
+        }
+        if (is.null(x = chunk.size)) {
+          chunk.size <- self$chunksize[MARGIN]
+        }
+        # Set the indices to use
+        if (is.null(x = index.use)) {
+          index.use <- 1:self$shape[MARGIN]
+        } else if (length(x = index.use) == 1) {
+          index.use <- index.use <- 1:index.use
+        } else {
+          index.use <- index.use[1]:index.use[2]
+        }
+        index.use[1] <- max(1, index.use[1])
+        index.use[2] <- min(index.use[2], self$shape[MARGIN])
+        # Setup our iterator
+        private$it <- ihasNext(iterable = ichunk(
+          iterable = index.use[1]:index.use[2],
+          chunkSize = chunk.size
+        ))
+      }
+      # Do the iterating
+      if (hasNext(obj = private$it)) {
+        chunk.indices <- unlist(x = nextElem(obj = private$it))
+        if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
+          return(switch(
+            EXPR = private$iter.margin,
+            '1' = self[[private$iter.dataset]][chunk.indices, ],
+            '2' = self[[private$iter.dataset]][, chunk.indices]
+          ))
+        } else {
+          return(self[[private$iter.dataset]][chunk.indices])
+        }
+      } else {
+        private$it <- NULL
+        return(NULL)
+      }
     }
   ),
   # Private fields and methods
@@ -200,6 +273,9 @@ loom <- R6Class(
   private = list(
     # Fields
     err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these function to create or connect to a loom file",
+    it = NULL,
+    iter.dataset = NULL,
+    iter.margin = NULL,
     # Methods
     load_attributes = function(MARGIN) {
       attribute <- switch(

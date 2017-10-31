@@ -37,10 +37,22 @@ A class for loom files
 
 \describe{
   \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
-  \item{\code{add.attribute(attribute, MARGIN)}}{Add extra information to this loom file; \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix}, \code{MARGIN} is either 1 for cells or 2 for genes}
+  \item{\code{add.attribute(attribute, MARGIN)}}{
+    Add extra information to this loom file where
+    \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
+    \code{MARGIN} is either 1 for cells or 2 for genes
+  }
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
+  \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}}{
+    Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
+    \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
+    If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.
+    Otherwise, pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes.
+    \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
+    \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
+  }
 }
 }
 

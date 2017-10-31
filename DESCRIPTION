@@ -14,7 +14,9 @@ Depends:
 Imports:
   R6,
   hdf5r,
-  utils
+  utils,
+  iterators,
+  itertools
 Collate:
   'loom.R'
 License: GPL-3
