@@ -98,33 +98,33 @@ loom <- R6Class(
         self$version <- as.character(x = packageVersion(pkg = 'loomR'))
       }
     },
-    add.layer = function(layer, name) {
-      # Layers have to be matricies
-      if (!is.matrix(x = layer)) {
-        layer <- as.matrix(x = layer)
+    add.layer = function(layers) {
+      # Value checking
+      if (!is.list(x = layers) || is.null(x = names(x = layers))) {
+        stop("'layers' must be a named list")
       }
       if (is.null(x = self$shape)) {
         stop(private$err_msg)
       }
-      do.transpose <- FALSE
-      if (any(dim(x = layer) != self$shape)) {
-        if (all(rev(x = dim(x = layer)) == self$shape)) {
-          do.transpose <- TRUE
-        } else {
-          stop(paste(
-            "All layers must have",
-            self$shape[1],
-            "rows for cells and",
-            self$shape[2],
-            "columns for genes"
-          ))
+      # Add layers
+      for (i in 1:length(x = layers)) {
+        if (!is.matrix(x = layers[[i]])) {
+          layers[[i]] <- as.matrix(x = layers[[i]])
         }
-      }
-      # Transpose the matrix since hdf5r uses column x row
-      if (do.transpose) {
-        self[['layers', name]] <- t(x = layer)
-      } else {
-        self[[layers, name]] <- layer
+        do.transpose <- FALSE
+        if (any(dim(x = layers[[i]]) != self$shape)) {
+          if (all(rev(x = dim(x = layers[[i]])) == self$shape)) {
+            do.transpose <- TRUE
+          } else {
+            stop(paste(
+              "All layers must have",
+              self$shape[1],
+              "rows for cells and",
+              self$shape[2],
+              "columns for genes"
+            ))
+          }
+        }
       }
       self$flush()
       private$load_layers()
