@@ -475,6 +475,20 @@ connect <- function(filename, mode = "r") {
   return(new.loom)
 }
 
+CreateLoomFromSeurat <- function(object, filename) {
+  object.data=t(object@raw.data[rownames(object@data),object@cell.names])
+  object.meta.data=object@meta.data
+  row_attrs=list(); col_attrs=list()
+  gene.names=colnames(object.data)
+  object.meta.data$ident = object@ident
+  object.meta.data$CellID = object@cell.names
+  for(i in 1:ncol(object.meta.data)) {
+    col_attrs[[colnames(object.meta.data)[i]]]=object.meta.data[,i]
+  }
+  row_attrs[["Gene"]]=gene.names
+  create(filename,object.data,gene.attrs = row_attrs, cell.attrs = col_attrs)
+}
+
 #need to comment
 #need to add progress bar
 #but otherwise, pretty cool
