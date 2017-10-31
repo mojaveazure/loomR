@@ -125,6 +125,11 @@ loom <- R6Class(
             ))
           }
         }
+        if (do.transpose) {
+          self[['layers', names(x = layers)[i]]] <- t(x = layers[[i]])
+        } else {
+          self[['layers', names(x = layers)[i]]] <- layers[[i]]
+        }
       }
       self$flush()
       private$load_layers()
