@@ -62,7 +62,8 @@ loom <- R6Class(
       if (do.validate) {
         # Run the validation steps
         validateLoom(object = self)
-        # Store the shape of /matrix
+        # Store /matrix and the shape of /matrix
+        self$matrix <- self[['matrix']]
         self$shape <- self[['matrix']]$dims
         # Store the chunk size
         chunks <- h5attr(x = self, which = 'chunks')
@@ -276,6 +277,7 @@ create <- function(
     robj = t(x = data),
     chunk_dims = chunk.dims
   )
+  new.loom$shape <- new.loom[['matrix']]
   new.loom$shape <- new.loom[['matrix']]$dims
   if (!is.null(x = colnames(x = data))) {
     new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
