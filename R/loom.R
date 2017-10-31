@@ -127,6 +127,7 @@ loom <- R6Class(
       }
       self$flush()
       private$load_layers()
+      invisible(x = self)
     },
     add.attribute = function(attribute, MARGIN) {
       # Value checking
@@ -166,18 +167,22 @@ loom <- R6Class(
       gc(verbose = FALSE)
       # Load the attributes for this margin
       private$load_attributes(MARGIN = MARGIN)
+      invisible(x = self)
     },
     # Add attributes for genes
     add.row.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 2)
+      invisible(x = self)
     },
     # Add attributes for cells
     add.col.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 1)
+      invisible(x = self)
     },
     # Add metadata, follows cells
     add.meta.data = function(meta.data) {
       self$add.col.attribute(attribute = meta.data)
+      invisible(x = self)
     }
   ),
   # Private fields and methods
