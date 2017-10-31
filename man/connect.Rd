@@ -17,3 +17,6 @@ A loom file connection
 \description{
 Connect to a loom file
 }
+\seealso{
+\code{\link{loom-class}}
+}

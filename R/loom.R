@@ -7,8 +7,8 @@ NULL
 #' @docType class
 #' @name loom-class
 #' @rdname loom-class
-#' @return Object of \code{\link{R6Class}} to generate \code{loom} objects
-#' @format An \code{\link{R6Class}} object
+#' @return Object of \code{\link{R6::R6Class}} to generate \code{loom} objects
+#' @format An \code{\link{R6::R6Class}} object
 #' @seealso \code{\link{hdf5r::H5File}}
 #'
 #' @field version Version of loomR object was created under
@@ -239,6 +239,8 @@ loom <- R6Class(
 #'
 #' @seealso \code{\link{loom-class}}
 #'
+#' @export
+#'
 create <- function(
   filename,
   data,
@@ -311,7 +313,9 @@ create <- function(
 #'
 #' @param object A loom object
 #'
-#' @return None, errors if object is an invalid loom connection
+#' @return None, errors out if object is an invalid loom connection
+#'
+#' @seealso \code{\link{loom-class}}
 #'
 #' @export
 #'
@@ -327,7 +331,7 @@ validateLoom <- function(object) {
   }
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
   required.groups <- c('row_attrs', 'col_attrs', 'layers')
-  dim.matrix <- object[[root.datasets]]$dims # Rows x Columns
+  dim.matrix <- object[[root.datasets]]$dims # Columns x Rows
   names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
@@ -370,6 +374,8 @@ validateLoom <- function(object) {
 #' @param mode How do we connect to it? Pass 'r' for read-only or 'r+' for read/write
 #'
 #' @return A loom file connection
+#'
+#' @seealso \code{\link{loom-class}}
 #'
 #' @export
 #'

@@ -5,12 +5,12 @@
 \alias{loom-class}
 \alias{loom}
 \title{A class for loom files}
-\format{An \code{\link{R6Class}} object}
+\format{An \code{\link{R6::R6Class}} object}
 \usage{
 loom
 }
 \value{
-Object of \code{\link{R6Class}} to generate \code{loom} objects
+Object of \code{\link{R6::R6Class}} to generate \code{loom} objects
 }
 \description{
 A class for loom files
