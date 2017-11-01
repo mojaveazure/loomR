@@ -30,7 +30,7 @@ NULL
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
-#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}}{
+#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
 #'     If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.
@@ -232,43 +232,84 @@ loom <- R6Class(
         }
         # Set the indices to use
         if (is.null(x = index.use)) {
-          index.use <- 1:self$shape[MARGIN]
+          index.use <- c(1, self$shape[MARGIN])
         } else if (length(x = index.use) == 1) {
           index.use <- index.use <- 1:index.use
         } else {
-          index.use <- index.use[1]:index.use[2]
+          index.use <- c(index.use[1], index.use[2])
         }
         index.use[1] <- max(1, index.use[1])
         index.use[2] <- min(index.use[2], self$shape[MARGIN])
+        if (index.use[1] > index.use[2]) {
+          stop(paste0(
+            "Starting index (",
+            index.use[1],
+            ") must be lower than the ending index (",
+            index.use[2],
+            ")"
+          ))
+        }
         # Setup our iterator
         private$it <- ihasNext(iterable = ichunk(
           iterable = index.use[1]:index.use[2],
           chunkSize = chunk.size
         ))
+        private$iter.index <- c(index.use[1], ceiling(x = index.use[2] / chunk.size))
+      }
+      return(private$iter.index[1]:private$iter.index[2])
+      # # Do the iterating
+      # if (hasNext(obj = private$it)) {
+      #   chunk.indices <- unlist(x = nextElem(obj = private$it))
+      #   if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
+      #     return(switch(
+      #       EXPR = private$iter.margin,
+      #       '1' = self[[private$iter.dataset]][chunk.indices, ],
+      #       '2' = self[[private$iter.dataset]][, chunk.indices]
+      #     ))
+      #   } else {
+      #     return(self[[private$iter.dataset]][chunk.indices])
+      #   }
+      # } else {
+      #   private$it <- NULL
+      #   return(NULL)
+      # }
+    },
+    batch.next = function() {
+      if (!'hasNext.ihasNext' %in% suppressWarnings(expr = methods(class = class(x = private$it)))) {
+        stop("Please setup the iterator with self$batch.scan")
       }
       # Do the iterating
       if (hasNext(obj = private$it)) {
         chunk.indices <- unlist(x = nextElem(obj = private$it))
         if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
-          return(switch(
+          to.return <- switch(
             EXPR = private$iter.margin,
             '1' = self[[private$iter.dataset]][chunk.indices, ],
             '2' = self[[private$iter.dataset]][, chunk.indices]
-          ))
+          )
         } else {
-          return(self[[private$iter.dataset]][chunk.indices])
+          to.return <- self[[private$iter.dataset]][chunk.indices]
         }
+        if (!hasNext(obj = private$it)) {
+          private$reset_batch()
+        }
+        return(to.return)
       } else {
-        private$it <- NULL
+        private$reset_batch()
         return(NULL)
       }
     }
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
+  # @field it
+  # @field iter.dataset
+  # @field iter.margin
+  # @field iter.index
   # \describe{
   #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
+  #   \item{\code{reset_batch()}}{Reset the batch iterator fields}
   # }
   private = list(
     # Fields
@@ -276,6 +317,7 @@ loom <- R6Class(
     it = NULL,
     iter.dataset = NULL,
     iter.margin = NULL,
+    iter.index = NULL,
     # Methods
     load_attributes = function(MARGIN) {
       attribute <- switch(
@@ -308,6 +350,12 @@ loom <- R6Class(
           return(d)
         }
       ))
+    },
+    reset_batch = function() {
+      private$it <- NULL
+      private$iter.dataset <- NULL
+      private$iter.margin <- NULL
+      private$iter.index <- NULL
     }
   )
 )
@@ -355,16 +403,21 @@ create <- function(
   # Create the matrix
   new.loom$create_dataset(
     name = 'matrix',
-    robj = t(x = data),
+    robj = data,
     chunk_dims = chunk.dims
   )
-  new.loom$shape <- new.loom[['matrix']]
+  new.loom$matrix <- new.loom[['matrix']]
   new.loom$shape <- new.loom[['matrix']]$dims
+  # Groups
+  new.loom$create_group(name = 'layers')
+  new.loom$create_group(name = 'row_attrs')
+  new.loom$create_group(name = 'col_attrs')
+  # Check for the existance of gene or cell names
   if (!is.null(x = colnames(x = data))) {
     new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
   }
   if (!is.null(x = rownames(x = data))) {
-    new.loom$add.col.attribute(attribute = list('cell_names' = colnames(x = data)))
+    new.loom$add.col.attribute(attribute = list('cell_names' = rownames(x = data)))
   }
   # Store some constants as HDF5 attributes
   h5attr(x = new.loom, which = 'version') <- new.loom$version
@@ -373,13 +426,9 @@ create <- function(
     paste(new.loom[['matrix']]$chunk_dims, collapse = ', '),
     ')'
   )
-  # Groups
-  new.loom$create_group(name = 'layers')
-  new.loom$create_group(name = 'row_attrs')
-  new.loom$create_group(name = 'col_attrs')
   # Add layers
-  for (ly in layers) {
-    new.loom$add.layer(layer = ly)
+  if (!is.null(x = layers)) {
+    new.loom$add.layer(layer = layers)
   }
   if (!is.null(x = gene.attrs)) {
     new.loom$add.row.attribute(attribute = gene.attrs)
