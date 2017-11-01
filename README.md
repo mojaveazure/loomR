@@ -1,3 +1,8 @@
+<!--
+[![CRAN Version](https://www.r-pkg.org/badges/version/loomR)](https://cran.r-project.org/package=loomR) 
+[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/loomR)](https://cran.r-project.org/package=loomR)
+-->
+
 # loomR
 
 ### An R interface for loom files
@@ -8,7 +13,10 @@ For more information on loom files, please see the documentation for [loompy](ht
 
 loomR depends on:
  - [R](https://cran.r-project.org/) v3.4.x
- - The [hdf5r](https://github.com/hhoeflin/hdf5r) package
+ - The [R6](https://cran.r-project.org/package=R6) package
+ - The [hdf5r](https://cran.r-project.org/package=hdf5r) package
+ - The [iterators](https://cran.r-project.org/package=iterators) package
+ - The [itertools](https://cran.r-project.org/package=itertools) package
  - The HDF5 [C++ API](https://support.hdfgroup.org/HDF5/release/obtainsrc.html)
 
 To get the HDF5 C++ API, please see the table below:
