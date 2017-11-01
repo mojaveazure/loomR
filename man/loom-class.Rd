@@ -45,7 +45,7 @@ A class for loom files
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
-  \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next}}{
+  \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next()}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
     If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.

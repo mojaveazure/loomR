@@ -30,7 +30,7 @@ NULL
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
-#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next}}{
+#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next()}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
 #'     If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.
@@ -256,31 +256,19 @@ loom <- R6Class(
         ))
         private$iter.index <- c(index.use[1], ceiling(x = index.use[2] / chunk.size))
       }
+      # Return the times we iterate, this isn't important, we only need the length of this vector
       return(private$iter.index[1]:private$iter.index[2])
-      # # Do the iterating
-      # if (hasNext(obj = private$it)) {
-      #   chunk.indices <- unlist(x = nextElem(obj = private$it))
-      #   if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
-      #     return(switch(
-      #       EXPR = private$iter.margin,
-      #       '1' = self[[private$iter.dataset]][chunk.indices, ],
-      #       '2' = self[[private$iter.dataset]][, chunk.indices]
-      #     ))
-      #   } else {
-      #     return(self[[private$iter.dataset]][chunk.indices])
-      #   }
-      # } else {
-      #   private$it <- NULL
-      #   return(NULL)
-      # }
     },
     batch.next = function() {
+      # Ensure that we have a proper iterator
       if (!'hasNext.ihasNext' %in% suppressWarnings(expr = methods(class = class(x = private$it)))) {
         stop("Please setup the iterator with self$batch.scan")
       }
       # Do the iterating
       if (hasNext(obj = private$it)) {
+        # Get the indices for this chunk
         chunk.indices <- unlist(x = nextElem(obj = private$it))
+        # If we're working with a matrix dataset, ensure chunking on proper axis
         if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
           to.return <- switch(
             EXPR = private$iter.margin,
@@ -288,13 +276,16 @@ loom <- R6Class(
             '2' = self[[private$iter.dataset]][, chunk.indices]
           )
         } else {
+          # Otherwise, iterating over an attribute (1 dimensional)
           to.return <- self[[private$iter.dataset]][chunk.indices]
         }
+        # Determine if we reset the iterator
         if (!hasNext(obj = private$it)) {
           private$reset_batch()
         }
         return(to.return)
       } else {
+        # Just in case
         private$reset_batch()
         return(NULL)
       }
@@ -302,10 +293,10 @@ loom <- R6Class(
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
-  # @field it
-  # @field iter.dataset
-  # @field iter.margin
-  # @field iter.index
+  # @field it Iterator object for batch.scan and batch.next
+  # @field iter.dataset Dataset for iterating on
+  # @field iter.margin Margin to iterate over
+  # @field iter.index # Index values for iteration
   # \describe{
   #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
