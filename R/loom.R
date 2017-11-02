@@ -259,7 +259,7 @@ loom <- R6Class(
       # Return the times we iterate, this isn't important, we only need the length of this vector
       return(private$iter.index[1]:private$iter.index[2])
     },
-    batch.next = function() {
+    batch.next = function(return.data = TRUE) {
       # Ensure that we have a proper iterator
       if (!'hasNext.ihasNext' %in% suppressWarnings(expr = methods(class = class(x = private$it)))) {
         stop("Please setup the iterator with self$batch.scan")
@@ -268,16 +268,20 @@ loom <- R6Class(
       if (hasNext(obj = private$it)) {
         # Get the indices for this chunk
         chunk.indices <- unlist(x = nextElem(obj = private$it))
-        # If we're working with a matrix dataset, ensure chunking on proper axis
-        if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
-          to.return <- switch(
-            EXPR = private$iter.margin,
-            '1' = self[[private$iter.dataset]][chunk.indices, ],
-            '2' = self[[private$iter.dataset]][, chunk.indices]
-          )
+        if (return.data) {
+          # If we're working with a matrix dataset, ensure chunking on proper axis
+          if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
+            to.return <- switch(
+              EXPR = private$iter.margin,
+              '1' = self[[private$iter.dataset]][chunk.indices, ],
+              '2' = self[[private$iter.dataset]][, chunk.indices]
+            )
+          } else {
+            # Otherwise, iterating over an attribute (1 dimensional)
+            to.return <- self[[private$iter.dataset]][chunk.indices]
+          }
         } else {
-          # Otherwise, iterating over an attribute (1 dimensional)
-          to.return <- self[[private$iter.dataset]][chunk.indices]
+          to.return <- chunk.indices
         }
         # Determine if we reset the iterator
         if (!hasNext(obj = private$it)) {
@@ -289,7 +293,8 @@ loom <- R6Class(
         private$reset_batch()
         return(NULL)
       }
-    }
+    },
+    apply = function() {}
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
@@ -527,6 +532,114 @@ CreateLoomFromSeurat <- function(object, filename) {
   }
   row_attrs[["Gene"]]=gene.names
   create(filename,object.data,gene.attrs = row_attrs, cell.attrs = col_attrs)
+}
+
+#' Map a function or a series of functions over a loom file
+#'
+#' @param X A loom object
+#' @param MARGIN The dimmension to map over, pass 1 for cells or 2 for genes
+#' @param FUN A function to map to the loom file
+#' @param chunk.size Chunk size to use, defaults to \code{loomfile$chunksize[MARGIN]}
+#' @param index.use Indices of the dataset to use, defaults to \code{1:loomfile$shape[MARGIN]}
+#' @param dataset.use Dataset to use, defauts to 'matrix'
+#' @param display.progress Display a progress bar
+#' @param expected ...
+#' @param ... Extra parameters for FUN
+#'
+#' @return The results of the map
+#'
+#' @importFrom utils txtProgressBar setTxtProgressBar
+#'
+#' @export
+#'
+map <- function(
+  X,
+  MARGIN = 1,
+  FUN,
+  chunk.size = NULL,
+  index.use = NULL,
+  dataset.use = 'matrix',
+  display.progress = TRUE,
+  expected = NULL,
+  ...
+) {
+  if (!inherits(x = X, what = 'loom')) {
+    stop("map only works on loom objects")
+  }
+  if (!inherits(x = FUN, what = 'function')) {
+    stop("FUN must be a function")
+  }
+  # Check for existance of dataset
+  if (!any(grepl(pattern = dataset.use, x = list.datasets(object = X)))) {
+    stop(paste("Cannot find dataset", dataset.use, "in the loom file"))
+  }
+  # Figure out if we're returning a vector or matrix
+  full.dataset <- grep(
+    pattern = dataset.use,
+    x = list.datasets(object = X),
+    value = TRUE
+  )
+  results.matrix <- TRUE
+  if (grepl(pattern = 'col_attrs', x = full.dataset)) {
+    MARGIN <- 1
+    results.matrix <- FALSE
+  } else if (grepl(pattern = 'row_attrs', x = full.dataset)) {
+    MARGIN <- 2
+    results.matrix <- FALSE
+  }
+  if (!is.null(x = expected)) {
+    results.matrix <- switch(
+      EXPR = expected,
+      'vector' = FALSE,
+      'matrix' = TRUE,
+      stop("'expected' must be one of 'matrix', 'vector', or NULL")
+    )
+  }
+  # Determine the shape of our results
+  if (!(MARGIN %in% c(1, 2))) {
+    stop("MARGIN must be either 1 (cells) or 2 (genes)")
+  }
+  if (is.null(x = index.use)) {
+    index.use <- 1:X$shape[MARGIN]
+  } else if (length(x = index.use) == 1) {
+    index.use <- c(1, index.use)
+  }
+  index.use[1] <- max(1, index.use[1])
+  index.use[2] <- min(index.use[2], X$shape[MARGIN])
+  batch <- X$batch.scan(
+    chunk.size = chunk.size,
+    MARGIN = MARGIN,
+    index.use = index.use,
+    dataset.use = dataset.use
+  )
+  # Create our results holding object
+  if (results.matrix) {
+    switch(
+      EXPR = MARGIN,
+      '1' = results <- matrix(ncol = X$shape[2], nrow = length(x = batch)),
+      '2' = results <- matrix(nrow = X$shape[1], ncol = length(x = batch))
+    )
+  } else {
+    results <- vector(length = length(x = batch))
+  }
+  if (display.progress) {
+    pb <- txtProgressBar(char = '=', style = 3)
+  }
+  for (i in 1:length(x = batch)) {
+    if (results.matrix) {
+      if (MARGIN == 1) {
+        results[i, ] <- FUN(X$batch.next(), ...)
+      } else if (MARGIN == 2) {
+        results[, i] <- FUN(X$batch.next(), ...)
+      }
+    } else {
+      results[]
+    }
+    if (display.progress) {
+      setTxtProgressBar(pb = pb, value = i / length(x = batch))
+    }
+  }
+  invisible(x = NULL)
 }
 
 #need to comment
