@@ -1,18 +1,23 @@
-#' @import R6
 #' @importFrom methods setOldClass
 NULL
 
+#' An R interface for loom files
+#'
+#' @docType package
+#' @name loomR
+#'
+NULL
+
+# Hooks to set loom as an S4 class upon
+# loadNamespace or library/require
 .onLoad <- function(libname, pkgname) {
   setOldClass(Classes = 'loom')
 }
 
-.onAttach <- function(libname, pkgname) {
-  .onLoad(libname = libname, pkgname = pkgname)
-}
-
 # # Examples setting S4 methods for R6 classes
 # # Requires the setOldClass from above
-# setGeneric(
+# #' @export foo
+# methods::setGeneric(
 #   name = 'foo',
 #   signature = 'x',
 #   def = function(x) {
@@ -20,7 +25,8 @@ NULL
 #   }
 # )
 #
-# setMethod(
+# #' @exportMethod foo
+# methods::setMethod(
 #   f = 'foo',
 #   signature = c('x' = 'loom'),
 #   definition = function(x) {

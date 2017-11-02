@@ -18,8 +18,8 @@ Imports:
   iterators,
   itertools
 Collate:
-  'S4.R'
   'loom.R'
+  'package.R'
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
