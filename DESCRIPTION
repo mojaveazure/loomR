@@ -19,6 +19,7 @@ Imports:
   itertools
 Collate:
   'loom.R'
+  'internal.R'
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
