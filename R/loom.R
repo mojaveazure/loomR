@@ -7,6 +7,7 @@ NULL
 #' @docType class
 #' @name loom-class
 #' @rdname loom-class
+#' @aliases loom
 #' @return Object of \code{\link{R6::R6Class}} to generate \code{loom} objects
 #' @format An \code{\link{R6::R6Class}} object
 #' @seealso \code{\link{hdf5r::H5File}}
@@ -38,11 +39,12 @@ NULL
 #'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
 #'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
 #'   }
+#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use)}}{...}
 #' }
 #'
 #' @importFrom iterators nextElem
 #' @importFrom utils packageVersion
-#' @importFrom itertools ihasNext ichunk hasNext
+#' @importFrom itertools hasNext ihasNext ichunk
 #'
 #' @export
 #'
@@ -294,7 +296,16 @@ loom <- R6Class(
         return(NULL)
       }
     },
-    apply = function() {}
+    apply = function(
+      name,
+      FUN,
+      MARGIN = 1,
+      chunk.size = NULL,
+      index.use = NULL,
+      dataset.use = 'matrix'
+    ) {
+      invisible(x = NULL)
+    }
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
@@ -309,7 +320,7 @@ loom <- R6Class(
   # }
   private = list(
     # Fields
-    err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these function to create or connect to a loom file",
+    err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
     it = NULL,
     iter.dataset = NULL,
     iter.margin = NULL,

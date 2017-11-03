@@ -53,6 +53,7 @@ A class for loom files
     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
   }
+  \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use)}}{...}
 }
 }
 
