@@ -22,7 +22,7 @@ map(self, f_list = list(mean, var), MARGIN = 1, chunksize = 1000,
 
 \item{display.progress}{Display a progress bar}
 
-\item{expected}{...}
+\item{expected}{Shape of expected results. Can pass either 'matrix' or 'vector'; defaults to shape of 'dataset.use'}
 
 \item{...}{Extra parameters for FUN}
 }

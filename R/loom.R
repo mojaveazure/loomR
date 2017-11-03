@@ -31,20 +31,22 @@ NULL
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
-#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use)}, \code{batch.next()}}{
+#'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next()}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
-#'     If the dataset is in col_attrs, pass \code{MARGIN = 1}; if in row_attrs, pass \code{MARGIN = 2}.
-#'     Otherwise, pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes.
+#'     Pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes for 'matrix' or any dataset in 'layers'.
+#'     To force reevaluation of the iterator object, pass \code{force.reset = TRUE}.
+#'     \code{MARGIN} does not need to be set for datasets in 'row_attrs' or 'col_attrs'.
 #'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
 #'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
 #'   }
-#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use)}}{...}
+#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use, expected, ...)}}{...}
+#'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, expected, ...)}}{...}
 #' }
 #'
 #' @importFrom iterators nextElem
-#' @importFrom utils packageVersion
 #' @importFrom itertools hasNext ihasNext ichunk
+#' @importFrom utils packageVersion txtProgressBar setTxtProgressBar
 #'
 #' @export
 #'
@@ -211,9 +213,10 @@ loom <- R6Class(
       chunk.size = NULL,
       MARGIN = 1,
       index.use = NULL,
-      dataset.use = 'matrix'
+      dataset.use = 'matrix',
+      force.reset = FALSE
     ) {
-      if (is.null(x = private$it) || !grepl(pattern = dataset.use, x = private$iter.dataset)) {
+      if (is.null(x = private$it) || !grepl(pattern = dataset.use, x = private$iter.dataset) || force.reset) {
         # Check the existence of the dataset
         private$iter.dataset <- grep(
           pattern = dataset.use,
@@ -222,6 +225,11 @@ loom <- R6Class(
         )
         if (length(x = private$iter.dataset) != 1) {
           stop(paste0("Cannot find dataset '", dataset.use, "' in the loom file"))
+        }
+        if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
+          MARGIN <- 1
+        } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
+          MARGIN <- 2
         }
         # Check the margin
         if (!(MARGIN %in% c(1, 2))) {
@@ -233,24 +241,7 @@ loom <- R6Class(
           chunk.size <- self$chunksize[MARGIN]
         }
         # Set the indices to use
-        if (is.null(x = index.use)) {
-          index.use <- c(1, self$shape[MARGIN])
-        } else if (length(x = index.use) == 1) {
-          index.use <- index.use <- 1:index.use
-        } else {
-          index.use <- c(index.use[1], index.use[2])
-        }
-        index.use[1] <- max(1, index.use[1])
-        index.use[2] <- min(index.use[2], self$shape[MARGIN])
-        if (index.use[1] > index.use[2]) {
-          stop(paste0(
-            "Starting index (",
-            index.use[1],
-            ") must be lower than the ending index (",
-            index.use[2],
-            ")"
-          ))
-        }
+        index.use <- private$iter_range(index.use = index.use)
         # Setup our iterator
         private$it <- ihasNext(iterable = ichunk(
           iterable = index.use[1]:index.use[2],
@@ -302,9 +293,102 @@ loom <- R6Class(
       MARGIN = 1,
       chunk.size = NULL,
       index.use = NULL,
-      dataset.use = 'matrix'
+      dataset.use = 'matrix',
+      expected = NULL,
+      ...
     ) {
       invisible(x = NULL)
+    },
+    map = function(
+      FUN,
+      MARGIN = 1,
+      chunk.size = NULL,
+      index.use = NULL,
+      dataset.use = 'matrix',
+      display.progress = TRUE,
+      expected = NULL,
+      ...
+    ) {
+      if (!inherits(x = FUN, what = 'function')) {
+        stop("FUN must be a function")
+      }
+      # Checks datset, index, and MARGIN
+      # Sets full dataset path in private$iter.dataset
+      # Sets proper MARGIN in private$iter.margin
+      batch <- self$batch.scan(
+        chunk.size = chunk.size,
+        MARGIN = MARGIN,
+        index.use = index.use,
+        dataset.use = dataset.use,
+        force.reset = TRUE
+      )
+      # Check how we store our results
+      # And what the shape of our dataset is
+      results.matrix <- TRUE
+      dataset.matrix <- TRUE
+      if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
+        results.matrix <- FALSE
+        dataset.matrix <- FALSE
+      } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
+        results.matrix <- FALSE
+        dataset.matrix <- FALSE
+      }
+      if (!is.null(x = expected)) {
+        results.matrix <- switch(
+          EXPR = expected,
+          'vector' = FALSE,
+          'matrix' = TRUE,
+          stop("'expected' must be one of 'matrix', 'vector', or NULL")
+        )
+      }
+      # Determine the shape of our results
+      index.use <- private$iter_range(index.use = index.use)
+      # Create our results holding object
+      if (results.matrix) {
+        switch(
+          EXPR = private$iter.margin,
+          '1' = results <- matrix(
+            nrow = length(x = index.use[1]:index.use[2]),
+            ncol = self$shape[2]
+          ),
+          '2' = results <- matrix(
+            nrow = self$shape[1],
+            ncol = length(x = index.use[1]:index.use[2])
+          )
+        )
+      } else {
+        results <- vector(length = length(x = index.use[1]:index.use[2]))
+      }
+      if (display.progress) {
+        pb <- txtProgressBar(char = '=', style = 3)
+      }
+      for (i in 1:length(x = batch)) {
+        chunk.indices <- self$batch.next(return.data = FALSE)
+        chunk.data <- if (dataset.matrix) {
+          switch(
+            EXPR = MARGIN,
+            '1' = self[[dataset.use]][chunk.indices, ],
+            '2' = self[[dataset.use]][, chunk.indices]
+          )
+        } else {
+          self[[dataset.use]][chunk.indices]
+        }
+        chunk.data <- FUN(chunk.data, ...)
+        if (results.matrix) {
+          if (MARGIN == 1) {
+            results[chunk.indices, ] <- chunk.data
+          } else if (MARGIN == 2) {
+            results[, chunk.indices] <- chunk.data
+          }
+        } else {
+          results[chunk.indices] <- chunk.data
+        }
+        if (display.progress) {
+          setTxtProgressBar(pb = pb, value = i / length(x = batch))
+        }
+      }
+      private$reset_batch()
+      return(results)
     }
   ),
   # Private fields and methods
@@ -317,6 +401,7 @@ loom <- R6Class(
   #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
   #   \item{\code{reset_batch()}}{Reset the batch iterator fields}
+  #   \item{\code{iter_range(index.use)}}{Get the range of indices for a batch iteration}
   # }
   private = list(
     # Fields
@@ -363,6 +448,35 @@ loom <- R6Class(
       private$iter.dataset <- NULL
       private$iter.margin <- NULL
       private$iter.index <- NULL
+    },
+    iter_range = function(index.use) {
+      if (is.null(private$iter.margin)) {
+        stop("Batch processing hasn't been set up")
+      }
+      if (is.null(x = index.use)) {
+        # If no index was provided, use entire range for this margin
+        index.use <- c(1, self$shape[private$iter.margin])
+      } else if (length(x = index.use) == 1) {
+        # If one index was provided, start at one and go to index
+        index.use <- c(1, index.use)
+      } else {
+        # Use index.use[1] and index.use[2]
+        index.use <- c(index.use[1], index.use[2])
+      }
+      # Ensure the indices provided fit within the range of the dataset
+      index.use[1] <- max(1, index.use[1])
+      index.use[2] <- min(index.use[2], self$shape[private$iter.margin])
+      # Ensure that index.use[1] is greater than index.use[2]
+      if (index.use[1] > index.use[2]) {
+        stop(paste0(
+          "Starting index (",
+          index.use[1],
+          ") must be lower than the ending index (",
+          index.use[2],
+          ")"
+        ))
+      }
+      return(index.use)
     }
   )
 )
@@ -554,7 +668,7 @@ CreateLoomFromSeurat <- function(object, filename) {
 #' @param index.use Indices of the dataset to use, defaults to \code{1:loomfile$shape[MARGIN]}
 #' @param dataset.use Dataset to use, defauts to 'matrix'
 #' @param display.progress Display a progress bar
-#' @param expected ...
+#' @param expected Shape of expected results. Can pass either 'matrix' or 'vector'; defaults to shape of 'dataset.use'
 #' @param ... Extra parameters for FUN
 #'
 #' @return The results of the map
@@ -591,12 +705,15 @@ map <- function(
     value = TRUE
   )
   results.matrix <- TRUE
+  dataset.matrix <- TRUE
   if (grepl(pattern = 'col_attrs', x = full.dataset)) {
     MARGIN <- 1
     results.matrix <- FALSE
+    dataset.matrix <- FALSE
   } else if (grepl(pattern = 'row_attrs', x = full.dataset)) {
     MARGIN <- 2
     results.matrix <- FALSE
+    dataset.matrix <- FALSE
   }
   if (!is.null(x = expected)) {
     results.matrix <- switch(
@@ -611,7 +728,7 @@ map <- function(
     stop("MARGIN must be either 1 (cells) or 2 (genes)")
   }
   if (is.null(x = index.use)) {
-    index.use <- 1:X$shape[MARGIN]
+    index.use <- c(1, X$shape[MARGIN])
   } else if (length(x = index.use) == 1) {
     index.use <- c(1, index.use)
   }
@@ -621,36 +738,54 @@ map <- function(
     chunk.size = chunk.size,
     MARGIN = MARGIN,
     index.use = index.use,
-    dataset.use = dataset.use
+    dataset.use = dataset.use,
+    force.reset = TRUE
   )
   # Create our results holding object
   if (results.matrix) {
     switch(
       EXPR = MARGIN,
-      '1' = results <- matrix(ncol = X$shape[2], nrow = length(x = batch)),
-      '2' = results <- matrix(nrow = X$shape[1], ncol = length(x = batch))
+      '1' = results <- matrix(
+        nrow = length(x = index.use[1]:index.use[2]),
+        ncol = X$shape[2]
+      ),
+      '2' = results <- matrix(
+        nrow = X$shape[1],
+        ncol = length(x = index.use[1]:index.use[2])
+      )
     )
   } else {
-    results <- vector(length = length(x = batch))
+    results <- vector(length = length(x = index.use[1]:index.use[2]))
   }
   if (display.progress) {
     pb <- txtProgressBar(char = '=', style = 3)
   }
   for (i in 1:length(x = batch)) {
+    chunk.indices <- X$batch.next(return.data = FALSE)
+    chunk.data <- if (dataset.matrix) {
+      switch(
+        EXPR = MARGIN,
+        '1' = X[[dataset.use]][chunk.indices, ],
+        '2' = X[[dataset.use]][, chunk.indices]
+      )
+    } else {
+      X[[dataset.use]][chunk.indices]
+    }
+    chunk.data <- FUN(chunk.data, ...)
     if (results.matrix) {
       if (MARGIN == 1) {
-        results[i, ] <- FUN(X$batch.next(), ...)
+        results[chunk.indices, ] <- chunk.data
       } else if (MARGIN == 2) {
-        results[, i] <- FUN(X$batch.next(), ...)
+        results[, chunk.indices] <- chunk.data
       }
     } else {
-      results[]
+      results[chunk.indices] <- chunk.data
     }
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = i / length(x = batch))
     }
   }
-  invisible(x = NULL)
+  return(results)
 }
 
 #need to comment
