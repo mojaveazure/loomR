@@ -40,8 +40,8 @@ NULL
 #'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
 #'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
 #'   }
-#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use, expected, ...)}}{...}
-#'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, expected, ...)}}{...}
+#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{...}
+#'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{...}
 #' }
 #'
 #' @importFrom iterators nextElem
@@ -294,9 +294,51 @@ loom <- R6Class(
       chunk.size = NULL,
       index.use = NULL,
       dataset.use = 'matrix',
+      display.progress = TRUE,
       expected = NULL,
       ...
     ) {
+      if (!inherits(x = FUN, what = 'function')) {
+        stop("FUN must be a function")
+      }
+      # Checks datset, index, and MARGIN
+      # Sets full dataset path in private$iter.dataset
+      # Sets proper MARGIN in private$iter.margin
+      batch <- self$batch.scan(
+        chunk.size = chunk.size,
+        MARGIN = MARGIN,
+        index.use = index.use,
+        dataset.use = dataset.use,
+        force.reset = TRUE
+      )
+      # Check how we store our results
+      # And what the shape of our dataset is
+      results.matrix <- TRUE
+      dataset.matrix <- TRUE
+      if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
+        results.matrix <- FALSE
+        dataset.matrix <- FALSE
+      } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
+        results.matrix <- FALSE
+        dataset.matrix <- FALSE
+      }
+      if (!is.null(x = expected)) {
+        results.matrix <- switch(
+          EXPR = expected,
+          'vector' = FALSE,
+          'matrix' = TRUE,
+          stop("'expected' must be one of 'matrix', 'vector', or NULL")
+        )
+      }
+      if (display.progress) {
+        pb <- txtProgressBar(char = '=', style = 3)
+      }
+      for (i in length(x = batch)) {
+        if (display.progress) {
+          setTxtProgressBar(pb = pb, value = i / length(x = batch))
+        }
+      }
+      private$reset_batch()
       invisible(x = NULL)
     },
     map = function(
