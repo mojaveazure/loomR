@@ -238,7 +238,7 @@ loom <- R6Class(
           private$iter.margin <- MARGIN
         }
         if (is.null(x = chunk.size)) {
-          chunk.size <- self$chunksize[MARGIN]
+          chunk.size <- self$chunksize[private$iter.margin]
         }
         # Set the indices to use
         index.use <- private$iter_range(index.use = index.use)
@@ -292,14 +292,22 @@ loom <- R6Class(
       FUN,
       MARGIN = 1,
       chunk.size = NULL,
-      index.use = NULL,
       dataset.use = 'matrix',
       display.progress = TRUE,
-      expected = NULL,
       ...
     ) {
+      if (self$mode == 'r') {
+        stop("Cannot write to disk in read-only mode")
+      }
       if (!inherits(x = FUN, what = 'function')) {
         stop("FUN must be a function")
+      }
+      # Check that we're storing our results properly
+      results.basename <- basename(path = name) # Basename of our results
+      results.dirname <- gsub(pattern = '/', replacement = '', x = dirname(path = name)) # Groupname of our results
+      dirnames <- c('col_attrs', 'row_attrs', 'layers') # Allowed group names
+      if (name %in% list.datasets(object = self)) {
+        stop(paste("A dataset with the name", name, "already exists!"))
       }
       # Checks datset, index, and MARGIN
       # Sets full dataset path in private$iter.dataset
@@ -307,39 +315,86 @@ loom <- R6Class(
       batch <- self$batch.scan(
         chunk.size = chunk.size,
         MARGIN = MARGIN,
-        index.use = index.use,
         dataset.use = dataset.use,
         force.reset = TRUE
       )
+      MARGIN <- private$iter.margin
+      dataset.use <- private$iter.dataset
+      # Ensure that our group name is allowed
+      name.check <- which(x = dirnames == results.dirname)
+      if (!any(name.check)) {
+        private$reset_batch()
+        stop(paste(
+          "The dataset must go into one of:",
+          paste(dirnames, collapse = ', ')
+        ))
+      }
+      # Check that our group matches our iteration
+      # ie. To store in col_attrs, MARGIN must be 1
+      if (name.check %in% c(1, 2) && name.check != private$iter.margin) {
+        private$reset_batch()
+        stop(paste(
+          "Iteration must be over",
+          c('cells', 'genes')[name.check],
+          paste0("(MARGIN = ", name.check, ")"),
+          "to store results in",
+          paste0("'", dirnames[name.check], "'")
+        ))
+      }
       # Check how we store our results
-      # And what the shape of our dataset is
-      results.matrix <- TRUE
-      dataset.matrix <- TRUE
-      if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
-        results.matrix <- FALSE
-        dataset.matrix <- FALSE
-      } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
-        results.matrix <- FALSE
-        dataset.matrix <- FALSE
-      }
-      if (!is.null(x = expected)) {
-        results.matrix <- switch(
-          EXPR = expected,
-          'vector' = FALSE,
-          'matrix' = TRUE,
-          stop("'expected' must be one of 'matrix', 'vector', or NULL")
-        )
-      }
+      dataset.matrix <- ('matrix' %in% private$iter.dataset || grepl(pattern = 'layers', x = private$iter.dataset))
+      results.matrix <- name.check == 3
+      # Get a connection to the group we're iterating over
+      group <- self[[results.dirname]]
       if (display.progress) {
         pb <- txtProgressBar(char = '=', style = 3)
       }
-      for (i in length(x = batch)) {
+      # Have to initialize the dataset differently than
+      first <- TRUE
+      for (i in 1:length(x = batch)) {
+        # Get the indices we're iterating over
+        chunk.indices <- self$batch.next(return.data = FALSE)
+        # Get the data and apply FUN
+        chunk.data <- if (dataset.matrix) {
+          switch(
+            EXPR = MARGIN,
+            '1' = self[[dataset.use]][chunk.indices, ],
+            '2' = self[[dataset.use]][, chunk.indices]
+          )
+        } else {
+          self[[private$iter.datset]][chunk.indices]
+        }
+        chunk.data <- FUN(chunk.data, ...)
+        # If this is the first iteration
+        # Initialize the dataset within group, set first to FALSE
+        if (first) {
+          group[[results.basename]] <- chunk.data
+          first <- FALSE
+        } else {
+          # If we're writign to a matrix
+          # Figure out which way we're writing the data
+          if (results.matrix) {
+            switch(
+              EXPR = MARGIN,
+              '1' = group[[results.basename]][chunk.indices, ] <- chunk.data,
+              '2' = group[[results.basename]][, chunk.indices] <- chunk.data
+            )
+          } else {
+            # Just write to the vector
+            group[[results.basename]][chunk.indices] <- chunk.data
+          }
+        }
         if (display.progress) {
           setTxtProgressBar(pb = pb, value = i / length(x = batch))
         }
       }
+      # Clean up and allow chaining
       private$reset_batch()
-      invisible(x = NULL)
+      # Load layers and attributes
+      private$load_layers()
+      private$load_attributes(MARGIN = 1) # Cells (col_attrs)
+      private$load_attributes(MARGIN = 2) # Genes (row_attrs)
+      invisible(x = self)
     },
     map = function(
       FUN,
@@ -364,6 +419,8 @@ loom <- R6Class(
         dataset.use = dataset.use,
         force.reset = TRUE
       )
+      MARGIN <- private$iter.margin
+      dataset.use <- private$iter.dataset
       # Check how we store our results
       # And what the shape of our dataset is
       results.matrix <- TRUE
