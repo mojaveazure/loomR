@@ -54,8 +54,15 @@ A class for loom files
     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
   }
-  \item{\code{apply(name, FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{...}
-  \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{...}
+  \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, display.progress, ...)}}{
+    Apply a function over a dataset within the loom file, stores the results in the loom file.
+    \code{name} must be the full name of the dataset ('group/name').
+    \code{apply} will always use the entire dataset specified in \code{dataset.use}
+  }
+  \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
+    Map a function onto a dataset within the loom file, returns the result into R.
+    The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
+  }
 }
 }
 
