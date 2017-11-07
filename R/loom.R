@@ -80,7 +80,11 @@ loom <- R6Class(
     col.attrs = NULL,
     row.attrs = NULL,
     # Methods
-    initialize = function(filename = NULL, mode = c('a', 'r', 'r+', 'w', 'w-'), ...) {
+    initialize = function(
+      filename = NULL,
+      mode = c('a', 'r', 'r+', 'w', 'w-'),
+      ...
+    ) {
       # If the file exists, run validation steps
       do.validate <- file.exists(filename) && !(mode %in% c('w', 'w+'))
       super$initialize(filename = filename, mode = mode, ...)
@@ -123,7 +127,11 @@ loom <- R6Class(
         self$version <- as.character(x = packageVersion(pkg = 'loomR'))
       }
     },
+    # Addding attributes and layers
     add.layer = function(layers) {
+      if (self$mode == 'r') {
+        stop("Cannot add a layer in read-only mode")
+      }
       # Value checking
       if (!is.list(x = layers) || is.null(x = names(x = layers))) {
         stop("'layers' must be a named list")
@@ -161,6 +169,9 @@ loom <- R6Class(
       invisible(x = self)
     },
     add.attribute = function(attribute, MARGIN) {
+      if (self$mode == 'r') {
+        stop("Cannot add attributes in read-only mode")
+      }
       # Value checking
       if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
         stop("'attribute' must be a named list")
@@ -200,22 +211,19 @@ loom <- R6Class(
       private$load_attributes(MARGIN = MARGIN)
       invisible(x = self)
     },
-    # Add attributes for genes
     add.row.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 2)
       invisible(x = self)
     },
-    # Add attributes for cells
     add.col.attribute = function(attribute) {
       self$add.attribute(attribute = attribute, MARGIN = 1)
       invisible(x = self)
     },
-    # Add metadata, follows cells
     add.meta.data = function(meta.data) {
       self$add.col.attribute(attribute = meta.data)
       invisible(x = self)
     },
-    # Batch scan
+    # Chunking functions
     batch.scan = function(
       chunk.size = NULL,
       MARGIN = 1,
@@ -495,7 +503,32 @@ loom <- R6Class(
       }
       private$reset_batch()
       return(results)
-    }
+    },
+    # Functions that modify `/matrix'
+    add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
+      lengths <- vector(
+        mode = 'integer',
+        length = 1 + length(x = attributes.data) + length(x = layers.data)
+      )
+      lengths[1] <- length(x = matrix.data)
+      attributes.end <- 1 + length(x = attributes.data)
+      if (attributes.end != 1) {
+        lengths[2:attributes.end] <- vapply(
+          X = attributes.data,
+          FUN = length,
+          FUN.VALUE = integer(length = 1L)
+        )
+      }
+      if (attributes.end != length(x = lengths)) {
+        lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
+          X = layers.data,
+          FUN = length,
+          FUN.VALUE = integer(length = 1L)
+        )
+      }
+      return(lengths)
+    },
+    add.loom = function() {}
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
