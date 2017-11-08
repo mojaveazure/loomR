@@ -9,6 +9,15 @@
 
 For more information on loom files, please see the documentation for [loompy](https://github.com/linnarsson-lab/loompy)
 
+## Compatability with loompy
+
+loomR aims to be completely compatible with loompy. Currently, loomR implements the following methods of the loompy API:
+ - map/apply
+ - create
+ - connect
+ - add layer
+ - add attriute
+
 ## Dependencies
 
 loomR depends on:
