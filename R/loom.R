@@ -720,16 +720,15 @@ create <- function(
   return(new.loom)
 }
 
-#' Validate a loom object
-#'
-#' @param object A loom object
-#'
-#' @return None, errors out if object is an invalid loom connection
-#'
-#' @seealso \code{\link{loom-class}}
-#'
-#' @export
-#'
+# Validate a loom object
+#
+# @param object A loom object
+#
+# @return None, errors out if object is an invalid loom connection
+#
+# @seealso \code{\link{loom-class}}
+#
+#
 validateLoom <- function(object) {
   # A loom file is a specific HDF5
   # We need a dataset in /matrix that's a two-dimensional dense matrix
@@ -798,24 +797,22 @@ connect <- function(filename, mode = "r") {
   return(new.loom)
 }
 
-#' Map a function or a series of functions over a loom file
-#'
-#' @param X A loom object
-#' @param MARGIN The dimmension to map over, pass 1 for cells or 2 for genes
-#' @param FUN A function to map to the loom file
-#' @param chunk.size Chunk size to use, defaults to \code{loomfile$chunksize[MARGIN]}
-#' @param index.use Indices of the dataset to use, defaults to \code{1:loomfile$shape[MARGIN]}
-#' @param dataset.use Dataset to use, defauts to 'matrix'
-#' @param display.progress Display a progress bar
-#' @param expected Shape of expected results. Can pass either 'matrix' or 'vector'; defaults to shape of 'dataset.use'
-#' @param ... Extra parameters for FUN
-#'
-#' @return The results of the map
-#'
-#' @importFrom utils txtProgressBar setTxtProgressBar
-#'
-#' @export
-#'
+# Map a function or a series of functions over a loom file
+#
+# @param X A loom object
+# @param MARGIN The dimmension to map over, pass 1 for cells or 2 for genes
+# @param FUN A function to map to the loom file
+# @param chunk.size Chunk size to use, defaults to \code{loomfile$chunksize[MARGIN]}
+# @param index.use Indices of the dataset to use, defaults to \code{1:loomfile$shape[MARGIN]}
+# @param dataset.use Dataset to use, defauts to 'matrix'
+# @param display.progress Display a progress bar
+# @param expected Shape of expected results. Can pass either 'matrix' or 'vector'; defaults to shape of 'dataset.use'
+# @param ... Extra parameters for FUN
+#
+# @return The results of the map
+#
+# @importFrom utils txtProgressBar setTxtProgressBar
+#
 map <- function(
   X,
   MARGIN = 1,
@@ -927,54 +924,54 @@ map <- function(
   return(results)
 }
 
-#need to comment
-#need to add progress bar
-#but otherwise, pretty cool
-#for paul to try :
-# f <- connect("~/Downloads/10X43_1.loom")
-# mean_var = map(f,f_list = c(mean,var),chunksize = 5000)
-# nGene <- map(f, f_list = function(x) length(which(x>0)), MARGIN = 2)
-map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, selection) {
-  n_func = length(f_list)
-  if (n_func == 1) {
-    f_list <- list(f_list)
-  }
-  if (MARGIN == 1) {
-    results <- list()
-    for (j in 1:n_func) {
-      results[[j]] <- numeric(0)
-    }
-    rows_per_chunk <- chunksize
-    ix <- 1
-    while (ix <= self@shape[1]) {
-      rows_per_chunk <- min(rows_per_chunk, self@shape[1] - ix + 1)
-      chunk <- self["matrix"][ix:(ix + rows_per_chunk - 1), ]
-      for (j in 1:n_func) {
-        new_results <- apply(chunk, 1, FUN = f_list[[j]])
-        results[[j]] <- c(results[[j]], new_results)
-      }
-      ix <- ix + chunksize
-    }
-  }
-  if (MARGIN == 2) {
-    results <- list()
-    for (j in 1:n_func) {
-      results[[j]] <- numeric(0)
-    }
-    cols_per_chunk <- chunksize
-    ix <- 1
-    while (ix <= self@shape[2]) {
-      cols_per_chunk <- min(cols_per_chunk, self@shape[2] - ix + 1)
-      chunk <- self["matrix"][, ix:(ix + cols_per_chunk - 1)]
-      for (j in 1:n_func) {
-        new_results <- apply(chunk, 2, FUN = f_list[[j]])
-        results[[j]] <- c(results[[j]], new_results)
-      }
-      ix <- ix + chunksize
-    }
-  }
-  if (n_func == 1) {
-    results <- results[[1]]
-  }
-  return(results)
-}
+# #need to comment
+# #need to add progress bar
+# #but otherwise, pretty cool
+# #for paul to try :
+# # f <- connect("~/Downloads/10X43_1.loom")
+# # mean_var = map(f,f_list = c(mean,var),chunksize = 5000)
+# # nGene <- map(f, f_list = function(x) length(which(x>0)), MARGIN = 2)
+# map <- function(self, f_list = list(mean, var), MARGIN=1, chunksize=1000, selection) {
+#   n_func = length(f_list)
+#   if (n_func == 1) {
+#     f_list <- list(f_list)
+#   }
+#   if (MARGIN == 1) {
+#     results <- list()
+#     for (j in 1:n_func) {
+#       results[[j]] <- numeric(0)
+#     }
+#     rows_per_chunk <- chunksize
+#     ix <- 1
+#     while (ix <= self@shape[1]) {
+#       rows_per_chunk <- min(rows_per_chunk, self@shape[1] - ix + 1)
+#       chunk <- self["matrix"][ix:(ix + rows_per_chunk - 1), ]
+#       for (j in 1:n_func) {
+#         new_results <- apply(chunk, 1, FUN = f_list[[j]])
+#         results[[j]] <- c(results[[j]], new_results)
+#       }
+#       ix <- ix + chunksize
+#     }
+#   }
+#   if (MARGIN == 2) {
+#     results <- list()
+#     for (j in 1:n_func) {
+#       results[[j]] <- numeric(0)
+#     }
+#     cols_per_chunk <- chunksize
+#     ix <- 1
+#     while (ix <= self@shape[2]) {
+#       cols_per_chunk <- min(cols_per_chunk, self@shape[2] - ix + 1)
+#       chunk <- self["matrix"][, ix:(ix + cols_per_chunk - 1)]
+#       for (j in 1:n_func) {
+#         new_results <- apply(chunk, 2, FUN = f_list[[j]])
+#         results[[j]] <- c(results[[j]], new_results)
+#       }
+#       ix <- ix + chunksize
+#     }
+#   }
+#   if (n_func == 1) {
+#     results <- results[[1]]
+#   }
+#   return(results)
+# }
