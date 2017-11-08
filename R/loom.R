@@ -40,7 +40,7 @@ NULL
 #'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
 #'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
 #'   }
-#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, display.progress, ...)}}{
+#'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
 #'     Apply a function over a dataset within the loom file, stores the results in the loom file.
 #'     \code{name} must be the full name of the dataset ('group/name').
 #'     \code{apply} will always use the entire dataset specified in \code{dataset.use}
@@ -159,10 +159,13 @@ loom <- R6Class(
           }
         }
         if (do.transpose) {
-          self[['layers', names(x = layers)[i]]] <- t(x = layers[[i]])
-        } else {
-          self[['layers', names(x = layers)[i]]] <- layers[[i]]
+          layers[[i]] <- t(x = layers[[i]])
         }
+        self[['layers']]$create_dataset(
+          name = names(x = layers)[i],
+          robj = layers[[i]],
+          chunk_dims = self$chunksize
+        )
       }
       self$flush()
       private$load_layers()
@@ -173,13 +176,19 @@ loom <- R6Class(
         stop("Cannot add attributes in read-only mode")
       }
       # Value checking
+      if (is.data.frame(x = attribute)) {
+        attribute <- as.list(x = attribute)
+      }
       if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
         stop("'attribute' must be a named list")
       }
-      if (length(x = attribute) > 1) {
-        for (i in attribute) {
-          if (!is.vector(x = attribute)) {
+      for (i in 1:length(x = attribute)) {
+        if (!is.vector(x = attribute[[i]]) && !is.factor(x = attribute[[i]])) {
+          if (length(x = dim(x = attribute[[i]])) > 1) {
+            print(length(x = attribute[[i]]))
             stop("All attributes must be one-dimensional vectors")
+          } else {
+            attribute[[i]] <- as.vector(x = attribute[[i]])
           }
         }
       }
@@ -308,6 +317,7 @@ loom <- R6Class(
       MARGIN = 1,
       chunk.size = NULL,
       dataset.use = 'matrix',
+      overwrite = FALSE,
       display.progress = TRUE,
       ...
     ) {
@@ -322,7 +332,11 @@ loom <- R6Class(
       results.dirname <- gsub(pattern = '/', replacement = '', x = dirname(path = name)) # Groupname of our results
       dirnames <- c('col_attrs', 'row_attrs', 'layers') # Allowed group names
       if (name %in% list.datasets(object = self)) {
-        stop(paste("A dataset with the name", name, "already exists!"))
+        if (overwrite) {
+          self$link_delete(name = name)
+        } else {
+          stop(paste("A dataset with the name", name, "already exists!"))
+        }
       }
       # Checks datset, index, and MARGIN
       # Sets full dataset path in private$iter.dataset
@@ -576,7 +590,7 @@ loom <- R6Class(
       self$layers <- unlist(x = lapply(
         X = names(x = self[['layers']]),
         FUN = function(n) {
-          d <- c(self[['layers', n]])
+          d <- list(self[[paste('layers', n, sep = '/')]])
           names(x = d) <- n
           return(d)
         }
