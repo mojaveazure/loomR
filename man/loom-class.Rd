@@ -36,11 +36,12 @@ A class for loom files
 \section{Methods}{
 
 \describe{
-  \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
-  \item{\code{add.attribute(attribute, MARGIN)}}{
+  \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
+  \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
     Add extra information to this loom file where
-    \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
-    \code{MARGIN} is either 1 for genes or 2 for cells
+    \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix},
+    \code{MARGIN} is either 1 for genes or 2 for cells, and
+    \code{overwrite} tells us whether we can overwrite existing attributes or not
   }
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}

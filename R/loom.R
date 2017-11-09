@@ -22,11 +22,12 @@ NULL
 #'
 #' @section Methods:
 #' \describe{
-#'   \item{\code{add.layer(layer)}}{Add a data layer to this loom file, must be in column (cells) by row (genes) orientation}
-#'   \item{\code{add.attribute(attribute, MARGIN)}}{
+#'   \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
+#'   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
 #'     Add extra information to this loom file where
-#'     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
-#'     \code{MARGIN} is either 1 for genes or 2 for cells
+#'     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix},
+#'     \code{MARGIN} is either 1 for genes or 2 for cells, and
+#'     \code{overwrite} tells us whether we can overwrite existing attributes or not
 #'   }
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
@@ -128,7 +129,7 @@ loom <- R6Class(
       }
     },
     # Addding attributes and layers
-    add.layer = function(layers) {
+    add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
         stop("Cannot add a layer in read-only mode")
       }
@@ -161,6 +162,17 @@ loom <- R6Class(
         if (do.transpose) {
           layers[[i]] <- t(x = layers[[i]])
         }
+        if (names(x = layers)[i] %in% list.datasets(object = self[['layers']])) {
+          if (overwrite) {
+            self[['layers']]$link_delete(name = names(x = layers)[i])
+          } else {
+            stop(paste(
+              "A layer with the name",
+              names(x = layers)[i],
+              "already!"
+            ))
+          }
+        }
         self[['layers']]$create_dataset(
           name = names(x = layers)[i],
           robj = layers[[i]],
@@ -168,10 +180,11 @@ loom <- R6Class(
         )
       }
       self$flush()
+      gc(verbose = FALSE)
       private$load_layers()
       invisible(x = self)
     },
-    add.attribute = function(attribute, MARGIN) {
+    add.attribute = function(attribute, MARGIN, overwrite = FALSE) {
       if (self$mode == 'r') {
         stop("Cannot add attributes in read-only mode")
       }
@@ -212,6 +225,17 @@ loom <- R6Class(
             "attributes must be of length",
             self$shape[MARGIN]
           ))
+        if (names(x = attribute)[i] %in% list.datasets(object = grp)) {
+          if (overwrite) {
+            grp$link_delete(name = names(x = attribute)[i])
+          } else {
+            stop(paste(
+              "An attribute with the name",
+              names(x = attribute)[i],
+              "already exists!"
+            ))
+          }
+        }
         grp[[names(x = attribute)[i]]] <- attribute[[i]]
       }
       self$flush()
@@ -220,16 +244,16 @@ loom <- R6Class(
       private$load_attributes(MARGIN = MARGIN)
       invisible(x = self)
     },
-    add.row.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 1)
+    add.row.attribute = function(attribute, overwrite = FALSE) {
+      self$add.attribute(attribute = attribute, MARGIN = 1, overwrite = overwrite)
       invisible(x = self)
     },
-    add.col.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 2)
+    add.col.attribute = function(attribute, overwrite = FALSE) {
+      self$add.attribute(attribute = attribute, MARGIN = 2, overwrite = overwrite)
       invisible(x = self)
     },
-    add.meta.data = function(meta.data) {
-      self$add.col.attribute(attribute = meta.data)
+    add.meta.data = function(meta.data, overwrite = FALSE) {
+      self$add.col.attribute(attribute = meta.data, overwrite = overwrite)
       invisible(x = self)
     },
     # Chunking functions
