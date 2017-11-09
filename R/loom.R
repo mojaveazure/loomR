@@ -218,7 +218,7 @@ loom <- R6Class(
       grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
       grp <- self[[grp.name]]
       for (i in 1:length(x = attribute)) {
-        if (length(attribute[[i]]) != self$shape[MARGIN])
+        if (length(attribute[[i]]) != rev(x = self$shape)[MARGIN])
           stop(paste(
             "All",
             switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
