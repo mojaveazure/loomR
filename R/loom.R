@@ -128,6 +128,9 @@ loom <- R6Class(
         self$version <- as.character(x = packageVersion(pkg = 'loomR'))
       }
     },
+    finalizer = function() {
+      self$close_all(close_self = TRUE)
+    }
     # Addding attributes and layers
     add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
