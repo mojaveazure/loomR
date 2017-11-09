@@ -272,6 +272,7 @@ loom <- R6Class(
           value = TRUE
         )
         if (length(x = private$iter.dataset) != 1) {
+          private$reset_batch()
           stop(paste0("Cannot find dataset '", dataset.use, "' in the loom file"))
         }
         if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
@@ -282,12 +283,13 @@ loom <- R6Class(
         }
         # Check the margin
         if (!(MARGIN %in% c(1, 2))) {
+          private$reset_batch()
           stop("MARGIN must be 1 (genes) or 2 (cells)")
         } else {
           private$iter.margin <- MARGIN
         }
         if (is.null(x = chunk.size)) {
-          chunk.size <- self$chunksize[private$iter.margin]
+          chunk.size <- rev(x = self$chunksize)[private$iter.margin]
         }
         # Set the indices to use
         index.use <- private$iter_range(index.use = index.use)
@@ -633,7 +635,7 @@ loom <- R6Class(
       }
       if (is.null(x = index.use)) {
         # If no index was provided, use entire range for this margin
-        index.use <- c(1, self$shape[private$iter.margin])
+        index.use <- c(1, rev(x = self$shape)[private$iter.margin])
       } else if (length(x = index.use) == 1) {
         # If one index was provided, start at one and go to index
         index.use <- c(1, index.use)
