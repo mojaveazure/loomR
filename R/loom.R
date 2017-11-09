@@ -414,8 +414,8 @@ loom <- R6Class(
         chunk.data <- if (dataset.matrix) {
           switch(
             EXPR = MARGIN,
-            '1' = self[[dataset.use]][, chunk.indices],
-            '2' = self[[dataset.use]][chunk.indices, ]
+            '1' = self[[dataset.use]][, chunk.indices], # Chunk genes
+            '2' = self[[dataset.use]][chunk.indices, ] # Chunk cells
           )
         } else {
           self[[private$iter.datset]][chunk.indices]
@@ -522,8 +522,8 @@ loom <- R6Class(
         chunk.data <- if (dataset.matrix) {
           switch(
             EXPR = MARGIN,
-            '1' = self[[dataset.use]][chunk.indices, ],
-            '2' = self[[dataset.use]][, chunk.indices]
+            '1' = self[[dataset.use]][, chunk.indices], # Chunk genes
+            '2' = self[[dataset.use]][chunk.indices, ] # Chunk cells
           )
         } else {
           self[[dataset.use]][chunk.indices]
@@ -645,7 +645,7 @@ loom <- R6Class(
       }
       # Ensure the indices provided fit within the range of the dataset
       index.use[1] <- max(1, index.use[1])
-      index.use[2] <- min(index.use[2], self$shape[private$iter.margin])
+      index.use[2] <- min(index.use[2], rev(x = self$shape)[private$iter.margin])
       # Ensure that index.use[1] is greater than index.use[2]
       if (index.use[1] > index.use[2]) {
         stop(paste0(
