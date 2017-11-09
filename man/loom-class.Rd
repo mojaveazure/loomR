@@ -40,7 +40,7 @@ A class for loom files
   \item{\code{add.attribute(attribute, MARGIN)}}{
     Add extra information to this loom file where
     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
-    \code{MARGIN} is either 1 for cells or 2 for genes
+    \code{MARGIN} is either 1 for genes or 2 for cells
   }
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
@@ -48,10 +48,10 @@ A class for loom files
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next()}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
-    Pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes for 'matrix' or any dataset in 'layers'.
+    Pass \code{MARGIN = 1} to iterate on genes or \code{MARGIN = 2} to iterate on cells for 'matrix' or any dataset in 'layers'.
     To force reevaluation of the iterator object, pass \code{force.reset = TRUE}.
     \code{MARGIN} does not need to be set for datasets in 'row_attrs' or 'col_attrs'.
-    \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
+    \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 2,
     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
   }
   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{

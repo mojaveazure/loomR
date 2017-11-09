@@ -26,7 +26,7 @@ NULL
 #'   \item{\code{add.attribute(attribute, MARGIN)}}{
 #'     Add extra information to this loom file where
 #'     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix} and
-#'     \code{MARGIN} is either 1 for cells or 2 for genes
+#'     \code{MARGIN} is either 1 for genes or 2 for cells
 #'   }
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
@@ -34,10 +34,10 @@ NULL
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next()}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
-#'     Pass \code{MARGIN = 1} to iterate on cells or \code{MARGIN = 2} to iterate on genes for 'matrix' or any dataset in 'layers'.
+#'     Pass \code{MARGIN = 1} to iterate on genes or \code{MARGIN = 2} to iterate on cells for 'matrix' or any dataset in 'layers'.
 #'     To force reevaluation of the iterator object, pass \code{force.reset = TRUE}.
 #'     \code{MARGIN} does not need to be set for datasets in 'row_attrs' or 'col_attrs'.
-#'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 1,
+#'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 2,
 #'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
 #'   }
 #'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
@@ -120,8 +120,8 @@ loom <- R6Class(
         # Load layers
         private$load_layers()
         # Load attributes
-        private$load_attributes(MARGIN = 1) # Cells (col_attrs)
-        private$load_attributes(MARGIN = 2) # Genes (row_attrs)
+        private$load_attributes(MARGIN = 1) # Genes (row_attrs)
+        private$load_attributes(MARGIN = 2) # Cells (col_attrs
       } else {
         # Assume new HDF5 file
         self$version <- as.character(x = packageVersion(pkg = 'loomR'))
@@ -202,13 +202,13 @@ loom <- R6Class(
       if (is.null(x = self$shape)) {
         stop(private$err_msg)
       }
-      grp.name <- c('col_attrs', 'row_attrs')[MARGIN]
+      grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
       grp <- self[[grp.name]]
       for (i in 1:length(x = attribute)) {
         if (length(attribute[[i]]) != self$shape[MARGIN])
           stop(paste(
             "All",
-            switch(EXPR = MARGIN, '1' = 'cell', '2' = 'gene'),
+            switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
             "attributes must be of length",
             self$shape[MARGIN]
           ))
@@ -221,11 +221,11 @@ loom <- R6Class(
       invisible(x = self)
     },
     add.row.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 2)
+      self$add.attribute(attribute = attribute, MARGIN = 1)
       invisible(x = self)
     },
     add.col.attribute = function(attribute) {
-      self$add.attribute(attribute = attribute, MARGIN = 1)
+      self$add.attribute(attribute = attribute, MARGIN = 2)
       invisible(x = self)
     },
     add.meta.data = function(meta.data) {
@@ -235,7 +235,7 @@ loom <- R6Class(
     # Chunking functions
     batch.scan = function(
       chunk.size = NULL,
-      MARGIN = 1,
+      MARGIN = 2,
       index.use = NULL,
       dataset.use = 'matrix',
       force.reset = FALSE
@@ -250,14 +250,15 @@ loom <- R6Class(
         if (length(x = private$iter.dataset) != 1) {
           stop(paste0("Cannot find dataset '", dataset.use, "' in the loom file"))
         }
-        if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
+        if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
           MARGIN <- 1
-        } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
+        }
+        else if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
           MARGIN <- 2
         }
         # Check the margin
         if (!(MARGIN %in% c(1, 2))) {
-          stop("MARGIN must be 1 (cells) or 2 (genes)")
+          stop("MARGIN must be 1 (genes) or 2 (cells)")
         } else {
           private$iter.margin <- MARGIN
         }
@@ -290,8 +291,8 @@ loom <- R6Class(
           if (private$iter.dataset == 'matrix' || grepl(pattern = 'layers', x = private$iter.dataset)) {
             to.return <- switch(
               EXPR = private$iter.margin,
-              '1' = self[[private$iter.dataset]][chunk.indices, ],
-              '2' = self[[private$iter.dataset]][, chunk.indices]
+              '1' = self[[private$iter.dataset]][, chunk.indices], # Genes
+              '2' = self[[private$iter.dataset]][chunk.indices, ] # Cells
             )
           } else {
             # Otherwise, iterating over an attribute (1 dimensional)
@@ -314,7 +315,7 @@ loom <- R6Class(
     apply = function(
       name,
       FUN,
-      MARGIN = 1,
+      MARGIN = 2,
       chunk.size = NULL,
       dataset.use = 'matrix',
       overwrite = FALSE,
@@ -330,7 +331,7 @@ loom <- R6Class(
       # Check that we're storing our results properly
       results.basename <- basename(path = name) # Basename of our results
       results.dirname <- gsub(pattern = '/', replacement = '', x = dirname(path = name)) # Groupname of our results
-      dirnames <- c('col_attrs', 'row_attrs', 'layers') # Allowed group names
+      dirnames <- c('row_attrs', 'col_attrs', 'layers') # Allowed group names
       if (name %in% list.datasets(object = self)) {
         if (overwrite) {
           self$link_delete(name = name)
@@ -364,7 +365,7 @@ loom <- R6Class(
         private$reset_batch()
         stop(paste(
           "Iteration must be over",
-          c('cells', 'genes')[name.check],
+          c('genes', 'cells')[name.check],
           paste0("(MARGIN = ", name.check, ")"),
           "to store results in",
           paste0("'", dirnames[name.check], "'")
@@ -387,8 +388,8 @@ loom <- R6Class(
         chunk.data <- if (dataset.matrix) {
           switch(
             EXPR = MARGIN,
-            '1' = self[[dataset.use]][chunk.indices, ],
-            '2' = self[[dataset.use]][, chunk.indices]
+            '1' = self[[dataset.use]][, chunk.indices],
+            '2' = self[[dataset.use]][chunk.indices, ]
           )
         } else {
           self[[private$iter.datset]][chunk.indices]
@@ -405,8 +406,8 @@ loom <- R6Class(
           if (results.matrix) {
             switch(
               EXPR = MARGIN,
-              '1' = group[[results.basename]][chunk.indices, ] <- chunk.data,
-              '2' = group[[results.basename]][, chunk.indices] <- chunk.data
+              '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
+              '2' = group[[results.basename]][chunk.indices, ] <- chunk.data
             )
           } else {
             # Just write to the vector
@@ -421,13 +422,13 @@ loom <- R6Class(
       private$reset_batch()
       # Load layers and attributes
       private$load_layers()
-      private$load_attributes(MARGIN = 1) # Cells (col_attrs)
-      private$load_attributes(MARGIN = 2) # Genes (row_attrs)
+      private$load_attributes(MARGIN = 1) # Genes (row_attrs)
+      private$load_attributes(MARGIN = 2) # Cells (col_attrs)
       invisible(x = self)
     },
     map = function(
       FUN,
-      MARGIN = 1,
+      MARGIN = 2,
       chunk.size = NULL,
       index.use = NULL,
       dataset.use = 'matrix',
@@ -475,13 +476,13 @@ loom <- R6Class(
       if (results.matrix) {
         switch(
           EXPR = private$iter.margin,
-          '1' = results <- matrix(
-            nrow = length(x = index.use[1]:index.use[2]),
-            ncol = self$shape[2]
-          ),
-          '2' = results <- matrix(
+          '1' = results <- matrix( # Genes, make matrix with nCells rows and range(index.use) columns
             nrow = self$shape[1],
             ncol = length(x = index.use[1]:index.use[2])
+          ),
+          '2' = results <- matrix( # Cells, make matrix with range(index.use) rows and nGenes columns
+            nrow = length(x = index.use[1]:index.use[2]),
+            ncol = self$shape[2]
           )
         )
       } else {
@@ -504,9 +505,9 @@ loom <- R6Class(
         chunk.data <- FUN(chunk.data, ...)
         if (results.matrix) {
           if (MARGIN == 1) {
-            results[chunk.indices, ] <- chunk.data
-          } else if (MARGIN == 2) {
             results[, chunk.indices] <- chunk.data
+          } else if (MARGIN == 2) {
+            results[chunk.indices, ] <- chunk.data
           }
         } else {
           results[chunk.indices] <- chunk.data
@@ -517,32 +518,32 @@ loom <- R6Class(
       }
       private$reset_batch()
       return(results)
-    },
-    # Functions that modify `/matrix'
-    add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
-      lengths <- vector(
-        mode = 'integer',
-        length = 1 + length(x = attributes.data) + length(x = layers.data)
-      )
-      lengths[1] <- length(x = matrix.data)
-      attributes.end <- 1 + length(x = attributes.data)
-      if (attributes.end != 1) {
-        lengths[2:attributes.end] <- vapply(
-          X = attributes.data,
-          FUN = length,
-          FUN.VALUE = integer(length = 1L)
-        )
-      }
-      if (attributes.end != length(x = lengths)) {
-        lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
-          X = layers.data,
-          FUN = length,
-          FUN.VALUE = integer(length = 1L)
-        )
-      }
-      return(lengths)
-    },
-    add.loom = function() {}
+    }
+    # # Functions that modify `/matrix'
+    # add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
+    #   lengths <- vector(
+    #     mode = 'integer',
+    #     length = 1 + length(x = attributes.data) + length(x = layers.data)
+    #   )
+    #   lengths[1] <- length(x = matrix.data)
+    #   attributes.end <- 1 + length(x = attributes.data)
+    #   if (attributes.end != 1) {
+    #     lengths[2:attributes.end] <- vapply(
+    #       X = attributes.data,
+    #       FUN = length,
+    #       FUN.VALUE = integer(length = 1L)
+    #     )
+    #   }
+    #   if (attributes.end != length(x = lengths)) {
+    #     lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
+    #       X = layers.data,
+    #       FUN = length,
+    #       FUN.VALUE = integer(length = 1L)
+    #     )
+    #   }
+    #   return(lengths)
+    # },
+    # add.loom = function() {}
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
@@ -567,8 +568,8 @@ loom <- R6Class(
     load_attributes = function(MARGIN) {
       attribute <- switch(
         EXPR = MARGIN,
-        '1' = 'col_attrs',
-        '2' = 'row_attrs',
+        '1' = 'row_attrs',
+        '2' = 'col_attrs',
         stop('Invalid attribute dimension')
       )
       group <- self[[attribute]]
@@ -581,9 +582,9 @@ loom <- R6Class(
         }
       ))
       if (MARGIN == 1) {
-        self$col.attrs <- attributes
-      } else if (MARGIN == 2) {
         self$row.attrs <- attributes
+      } else if (MARGIN == 2) {
+        self$col.attrs <- attributes
       }
     },
     load_layers = function() {
