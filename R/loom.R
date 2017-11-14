@@ -111,7 +111,7 @@ loom <- R6Class(
           error = function(e) {
             if (mode != 'r') {
               version <- packageVersion(pkg = 'loomR')
-              h5attr(x = self, which = 'version') <- version
+              h5attr(x = self, which = 'version') <- as.character(x = version)
             } else {
               version <- NA_character_
             }
