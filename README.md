@@ -9,6 +9,10 @@
 
 For more information on loom files, please see the documentation for [loompy](https://github.com/linnarsson-lab/loompy)
 
+## Tutorial
+
+A tutorial for loomR can be found [here](http://satijalab.org/loomR/loomR_tutorial.html). A full function and method reference can be found [here](http://satijalab.org/loomR/loomR.pdf).
+
 ## Compatability with loompy
 
 loomR aims to be completely compatible with loompy. Currently, loomR implements the following methods of the loompy API:
