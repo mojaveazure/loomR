@@ -131,6 +131,11 @@ loom <- R6Class(
     finalizer = function() {
       self$close_all(close_self = TRUE)
     },
+    load.fields = function() {
+      private$load_layers()
+      private$load_attributes(MARGIN = 1)
+      private$load_attributes(MARGIN = 2)
+    }
     # Addding attributes and layers
     add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
@@ -547,31 +552,53 @@ loom <- R6Class(
       }
       private$reset_batch()
       return(results)
+    },
+    # Functions that modify `/matrix'
+    add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
+      # matrix.data is a vector of data for one cell or a list of data for several cells
+      # each entry in matrix.data must be the same length as number of genes
+      # attributes.data is an optional list or vector (with optional names) for col_attrs
+      # each entry in col_attrs must be the same length as the number of cells being added (NAs added for those that aren't)
+      # layers.data is an optional list (with optional names) for layers
+      # each entry in layers.data must be an N by M matrix where N is the number of genes and M is the number of cells
+      if (is.vector(x = matrix.data) && !is.list(x = matrix.data)) {
+        matrix.data <- list(matrix.data)
+      }
+      list.check <- vapply(
+        X = list(matrix.data, attributes.data, layers.data),
+        FUN = is.list,
+        FUN.VALUE = logical(length = 1L)
+      )
+      if (!all(list.check)) {
+        stop("'matrix.data', 'attributes.data', and 'layers.data' must be lists")
+      }
+      lengths <- vector(
+        mode = 'integer',
+        length = 1 + length(x = attributes.data) + length(x = layers.data)
+      )
+      lengths[1] <- length(x = matrix.data)
+      attributes.end <- 1 + length(x = attributes.data)
+      if (attributes.end != 1) {
+        lengths[2:attributes.end] <- vapply(
+          X = attributes.data,
+          FUN = length,
+          FUN.VALUE = integer(length = 1L)
+        )
+      }
+      if (attributes.end != length(x = lengths)) {
+        lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
+          X = layers.data,
+          FUN = length,
+          FUN.VALUE = integer(length = 1L)
+        )
+      }
+      num.cells.added <- max(lengths)
+      return(num.cells.added)
+      # private$load_layers()
+      # private$load_attributes(MARGIN = 1)
+      # private$load_attributes(MARGIN = 2)
+      return(lengths)
     }
-    # # Functions that modify `/matrix'
-    # add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
-    #   lengths <- vector(
-    #     mode = 'integer',
-    #     length = 1 + length(x = attributes.data) + length(x = layers.data)
-    #   )
-    #   lengths[1] <- length(x = matrix.data)
-    #   attributes.end <- 1 + length(x = attributes.data)
-    #   if (attributes.end != 1) {
-    #     lengths[2:attributes.end] <- vapply(
-    #       X = attributes.data,
-    #       FUN = length,
-    #       FUN.VALUE = integer(length = 1L)
-    #     )
-    #   }
-    #   if (attributes.end != length(x = lengths)) {
-    #     lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
-    #       X = layers.data,
-    #       FUN = length,
-    #       FUN.VALUE = integer(length = 1L)
-    #     )
-    #   }
-    #   return(lengths)
-    # },
     # add.loom = function() {}
   ),
   # Private fields and methods
