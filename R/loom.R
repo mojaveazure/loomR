@@ -130,7 +130,7 @@ loom <- R6Class(
     },
     finalizer = function() {
       self$close_all(close_self = TRUE)
-    }
+    },
     # Addding attributes and layers
     add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
