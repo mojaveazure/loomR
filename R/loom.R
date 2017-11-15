@@ -135,7 +135,7 @@ loom <- R6Class(
       private$load_layers()
       private$load_attributes(MARGIN = 1)
       private$load_attributes(MARGIN = 2)
-    }
+    },
     # Addding attributes and layers
     add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
