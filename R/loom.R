@@ -84,16 +84,28 @@ loom <- R6Class(
     initialize = function(
       filename = NULL,
       mode = c('a', 'r', 'r+', 'w', 'w-'),
+      skip.validate = FALSE,
       ...
     ) {
       # If the file exists, run validation steps
       do.validate <- file.exists(filename) && !(mode %in% c('w', 'w+'))
+      private$skipped.validation <- skip.validate
       super$initialize(filename = filename, mode = mode, ...)
       if (do.validate) {
         # Run the validation steps
-        validateLoom(object = self)
+        if (skip.validate) {
+          warning("Skipping validation step, some fields are not populated")
+        } else {
+          validateLoom(object = self)
+        }
         # Store /matrix and the shape of /matrix
-        self$matrix <- self[['matrix']]
+        if (skip.validate) {
+          if (getOption(x = 'verbose')) {
+            warning("Not setting matrix field")
+          }
+        } else {
+          self$matrix <- self[['matrix']]
+        }
         self$shape <- self[['matrix']]$dims
         # Store the chunk size
         chunks <- h5attr(x = self, which = 'chunks')
@@ -299,6 +311,7 @@ loom <- R6Class(
         if (is.null(x = chunk.size)) {
           chunk.size <- rev(x = self$chunksize)[private$iter.margin]
         }
+        private$iter.chunksize <- chunk.size
         # Set the indices to use
         index.use <- private$iter_range(index.use = index.use)
         # Setup our iterator
@@ -306,10 +319,10 @@ loom <- R6Class(
           iterable = index.use[1]:index.use[2],
           chunkSize = chunk.size
         ))
-        private$iter.index <- c(index.use[1], ceiling(x = index.use[2] / chunk.size))
+        private$iter.index <- index.use
       }
       # Return the times we iterate, this isn't important, we only need the length of this vector
-      return(private$iter.index[1]:private$iter.index[2])
+      return(1:ceiling((private$iter.index[2] - private$iter.index[1]) / private$iter.chunksize))
     },
     batch.next = function(return.data = TRUE) {
       # Ensure that we have a proper iterator
@@ -617,9 +630,11 @@ loom <- R6Class(
     # Fields
     err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
     it = NULL,
+    iter.chunksize = NULL,
     iter.dataset = NULL,
     iter.margin = NULL,
     iter.index = NULL,
+    skipped.validation = FALSE,
     # Methods
     load_attributes = function(MARGIN) {
       attribute <- switch(
@@ -644,17 +659,24 @@ loom <- R6Class(
       }
     },
     load_layers = function() {
-      self$layers <- unlist(x = lapply(
-        X = names(x = self[['layers']]),
-        FUN = function(n) {
-          d <- list(self[[paste('layers', n, sep = '/')]])
-          names(x = d) <- n
-          return(d)
+      if (private$skipped.validation) {
+        if (getOption(x = 'verbose')) {
+          warning("Not loading layers field")
         }
-      ))
+      } else {
+        self$layers <- unlist(x = lapply(
+          X = names(x = self[['layers']]),
+          FUN = function(n) {
+            d <- list(self[[paste('layers', n, sep = '/')]])
+            names(x = d) <- n
+            return(d)
+          }
+        ))
+      }
     },
     reset_batch = function() {
       private$it <- NULL
+      private$iter.chunksize <- NULL
       private$iter.dataset <- NULL
       private$iter.margin <- NULL
       private$iter.index <- NULL
@@ -839,6 +861,7 @@ validateLoom <- function(object) {
 #'
 #' @param filename The loom file to connect to
 #' @param mode How do we connect to it? Pass 'r' for read-only or 'r+' for read/write
+#' @param skip.validate Skip the validation steps, use only for extremely large loom files
 #'
 #' @return A loom file connection
 #'
@@ -846,11 +869,11 @@ validateLoom <- function(object) {
 #'
 #' @export
 #'
-connect <- function(filename, mode = "r") {
+connect <- function(filename, mode = "r", skip.validate = FALSE) {
   if (!(mode %in% c('r', 'r+'))) {
     stop("'mode' must be one of 'r' or 'r+'")
   }
-  new.loom <- loom$new(filename = filename, mode = mode)
+  new.loom <- loom$new(filename = filename, mode = mode, skip.validate = skip.validate)
   return(new.loom)
 }
 
