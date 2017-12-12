@@ -46,6 +46,11 @@ A class for loom files
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
+  \item{\code{get.attribute.df(attribute.layer, attribute.names, row.names, col.names)}}{
+    Extract a data.frame of \code{attribute.names} from an \code{attribute.layer} ("row" - row_attrs or "col" - col_attrs).
+    Returns a data.frame into memory with \code{attribute.names} as the columns.
+    Removes rows that are entirely composed of NA values.
+  }
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.

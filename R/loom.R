@@ -32,6 +32,11 @@ NULL
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
 #'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
+#'   \item{\code{get.attribute.df(attribute.layer, attribute.names, row.names, col.names)}}{
+#'     Extract a data.frame of \code{attribute.names} from an \code{attribute.layer} ("row" - row_attrs or "col" - col_attrs).
+#'     Returns a data.frame into memory with \code{attribute.names} as the columns.
+#'     Removes rows that are entirely composed of NA values.
+#'   }
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
@@ -275,6 +280,47 @@ loom <- R6Class(
     add.meta.data = function(meta.data, overwrite = FALSE) {
       self$add.col.attribute(attribute = meta.data, overwrite = overwrite)
       invisible(x = self)
+    },
+    get.attribute.df = function(attribute.layer = c("row", "col"),
+                           attribute.names = NULL,
+                           row.names = "gene_names",
+                           col.names = "cell_names"){
+      # takes multiple row_attrs or col_attrs and combines them into a data.frame,
+      # removing rows or columns that are entirely NAs.
+      #
+      # attribute.layer either "row" for row_attrs or "col" col_attrs
+      # attribute.names name of rows or columns to combine into matrix
+      # row.names either a character vector or name of an element in row_attrs
+      # col.names either a character vector or name of an element in col_attrs
+
+      if(!attribute.layer %in% c("row", "col")) {
+        stop("Invalid attribute.layer. Please select either 'row' or 'col'.")
+      }
+      attribute.layer <- paste0(attribute.layer, "_attrs")
+      # check that attribute names are present
+      if(!all(attribute.names %in% self[[attribute.layer]]$names)) {
+        invalid.names <- attribute.names[which(!attribute.names %in% self[[attribute.layer]]$names)]
+        stop(paste0("Invalid attribute.names: ", paste0(invalid.names, collapse = ", ")))
+      }
+      if(attribute.layer == "row_attrs") {
+        combined.df <- data.frame(self[[paste0(attribute.layer, "/", attribute.names[1])]][],
+                                  row.names = self[[paste0(attribute.layer, "/", row.names)]][])
+      } else {
+        combined.df <- data.frame(self[[paste0(attribute.layer, "/", attribute.names[1])]][],
+                                  row.names = self[[paste0(attribute.layer, "/", col.names)]][])
+      }
+      if (length(attribute.names) > 1) {
+        for (i in 2:length(attribute.names)) {
+          combined.df[, attribute.names[i]] <- self[[paste0(attribute.layer, "/", attribute.names[i])]][]
+        }
+      }
+      colnames(combined.df) <- attribute.names
+      # check if any row is all NAs
+      rows.to.remove <- unname(which(apply(X = combined.df, MARGIN = 1, FUN = function(x) all(is.na(x)))))
+      if (length(rows.to.remove) > 1) {
+        combined.df <- combined.df[-rows.to.remove, ]
+      }
+      return(combined.df)
     },
     # Chunking functions
     batch.scan = function(
