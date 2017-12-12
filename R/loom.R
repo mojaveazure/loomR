@@ -420,6 +420,7 @@ loom <- R6Class(
       name,
       FUN,
       MARGIN = 2,
+      index.use = NULL,
       chunk.size = NULL,
       dataset.use = 'matrix',
       overwrite = FALSE,
@@ -480,14 +481,49 @@ loom <- R6Class(
       results.matrix <- name.check == 3
       # Get a connection to the group we're iterating over
       group <- self[[results.dirname]]
+      # Ensure index.use is integers within the bounds of [1, self$shape[MARGIN]]
+      if (!is.null(x = index.use)) {
+        # Filter index.use to values between 1 and self$shape[MARGIN]
+        index.use <- as.integer(x = index.use)
+        index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
+        index.use <- as.vector(x = na.omit(object = index.use))
+        # If we still have values, figure out NAs, otherwise set index.use to NULL
+        if (length(x = index.use) > 0) {
+          # Do a trial run to figure out the class of NAs
+          na.use <- NA
+          if (display.progress) {
+            cat("Running trial to determine class of NAs\n")
+          }
+          trial <- switch(
+            EXPR = MARGIN,
+            '1' = self[[dataset.use]][, 1],
+            '2' = self[[dataset.use]][1, ]
+          )
+          trial <- FUN(trial, ...)
+          if (is.list(x = trial)) {
+            trial <- unlist(x = trial)
+          }
+          class(x = na.use) <- class(x = trial)
+        } else {
+          warning("No values passed to 'index.use' fall within the data, using all values")
+          index.use <- NULL
+        }
+      }
       if (display.progress) {
         pb <- txtProgressBar(char = '=', style = 3)
       }
       # Have to initialize the dataset differently than
+      # appending to it
       first <- TRUE
       for (i in 1:length(x = batch)) {
         # Get the indices we're iterating over
-        chunk.indices <- self$batch.next(return.data = FALSE)
+        these.indices <- self$batch.next(return.data = FALSE)
+        if (is.null(x = index.use)) {
+          chunk.indices <- these.indices
+        } else {
+          chunk.indices <- index.use[index.use %in% these.indices]
+          chunk.na <- these.indices[!(these.indices %in% chunk.indices)]
+        }
         # Get the data and apply FUN
         chunk.data <- if (dataset.matrix) {
           switch(
@@ -502,6 +538,21 @@ loom <- R6Class(
         # If this is the first iteration
         # Initialize the dataset within group, set first to FALSE
         if (first) {
+          if (!is.null(x = index.use)) {
+            # If we had indices to chunk on, create a holding matrix the size
+            # of what the results should be, add the
+            holding <- switch(
+              EXPR = MARGIN,
+              '1' = matrix(nrow = nrow(x = chunk.data), ncol = length(x = these.indices)),
+              '2' = matrix(nrow = length(x = these.indices), ncol = ncol(x = chunk.data))
+            )
+            switch (
+              EXPR = MARGIN,
+              '1' = holding[, chunk.indices] <- chunk.data,
+              '2' = holding[chunk.indices, ] <- chunk.data
+            )
+            chunk.data <- holding
+          }
           group[[results.basename]] <- chunk.data
           first <- FALSE
         } else {
@@ -513,9 +564,19 @@ loom <- R6Class(
               '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
               '2' = group[[results.basename]][chunk.indices, ] <- chunk.data
             )
+            if (!is.null(x = index.use)) {
+              switch(
+                EXPR = MARGIN,
+                '1' = group[results.basename][, chunk.na] <- na.use,
+                '2' = group[results.basename][chunk.na, ] <- na.use,
+              )
+            }
           } else {
             # Just write to the vector
             group[[results.basename]][chunk.indices] <- chunk.data
+            if (!is.null(x = index.use)) {
+              group[[results.basename]][chunk.na] <- na.use
+            }
           }
         }
         if (display.progress) {
