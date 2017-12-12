@@ -281,10 +281,12 @@ loom <- R6Class(
       self$add.col.attribute(attribute = meta.data, overwrite = overwrite)
       invisible(x = self)
     },
-    get.attribute.df = function(attribute.layer = c("row", "col"),
-                           attribute.names = NULL,
-                           row.names = "gene_names",
-                           col.names = "cell_names"){
+    get.attribute.df = function(
+      attribute.layer = c("row", "col"),
+      attribute.names = NULL,
+      row.names = "gene_names",
+      col.names = "cell_names"
+    ) {
       # takes multiple row_attrs or col_attrs and combines them into a data.frame,
       # removing rows or columns that are entirely NAs.
       #
@@ -292,32 +294,41 @@ loom <- R6Class(
       # attribute.names name of rows or columns to combine into matrix
       # row.names either a character vector or name of an element in row_attrs
       # col.names either a character vector or name of an element in col_attrs
-
-      if(!attribute.layer %in% c("row", "col")) {
+      if (!attribute.layer %in% c("row", "col")) {
         stop("Invalid attribute.layer. Please select either 'row' or 'col'.")
       }
       attribute.layer <- paste0(attribute.layer, "_attrs")
       # check that attribute names are present
-      if(!all(attribute.names %in% self[[attribute.layer]]$names)) {
+      if (!all(attribute.names %in% self[[attribute.layer]]$names)) {
         invalid.names <- attribute.names[which(!attribute.names %in% self[[attribute.layer]]$names)]
         stop(paste0("Invalid attribute.names: ", paste0(invalid.names, collapse = ", ")))
       }
       if(attribute.layer == "row_attrs") {
-        combined.df <- data.frame(self[[paste0(attribute.layer, "/", attribute.names[1])]][],
-                                  row.names = self[[paste0(attribute.layer, "/", row.names)]][])
+        combined.df <- data.frame(
+          self[[paste0(attribute.layer, "/", attribute.names[1])]][],
+          row.names = self[[paste0(attribute.layer, "/", row.names)]][]
+        )
       } else {
-        combined.df <- data.frame(self[[paste0(attribute.layer, "/", attribute.names[1])]][],
-                                  row.names = self[[paste0(attribute.layer, "/", col.names)]][])
+        combined.df <- data.frame(
+          self[[paste0(attribute.layer, "/", attribute.names[1])]][],
+          row.names = self[[paste0(attribute.layer, "/", col.names)]][]
+        )
       }
-      if (length(attribute.names) > 1) {
-        for (i in 2:length(attribute.names)) {
+      if (length(x = attribute.names) > 1) {
+        for (i in 2:length(x = attribute.names)) {
           combined.df[, attribute.names[i]] <- self[[paste0(attribute.layer, "/", attribute.names[i])]][]
         }
       }
-      colnames(combined.df) <- attribute.names
+      colnames(x = combined.df) <- attribute.names
       # check if any row is all NAs
-      rows.to.remove <- unname(which(apply(X = combined.df, MARGIN = 1, FUN = function(x) all(is.na(x)))))
-      if (length(rows.to.remove) > 1) {
+      rows.to.remove <- unname(obj = which(x = apply(
+        X = combined.df,
+        MARGIN = 1,
+        FUN = function(x) {
+          return(all(is.na(x = x)))
+        }
+      )))
+      if (length(x = rows.to.remove) > 1) {
         combined.df <- combined.df[-rows.to.remove, ]
       }
       return(combined.df)
