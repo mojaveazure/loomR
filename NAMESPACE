@@ -3,6 +3,7 @@
 export(connect)
 export(create)
 export(loom)
+export(subset.loom)
 import(hdf5r)
 importFrom(R6,R6Class)
 importFrom(iterators,nextElem)

@@ -5,7 +5,7 @@
 \title{Create a loom object}
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
-  layers = NULL, chunk.dims = "auto")
+  layers = NULL, chunk.dims = "auto", overwrite = FALSE)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
@@ -17,6 +17,8 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 \item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}}
 
 \item{chunk.dims}{A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize}
+
+\item{overwrite}{Overwrite an already existing loom file?}
 }
 \value{
 A connection to a loom file

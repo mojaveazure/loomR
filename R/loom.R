@@ -838,6 +838,7 @@ loom <- R6Class(
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
+#' @param overwrite Overwrite an already existing loom file?
 #'
 #' @return A connection to a loom file
 #'
@@ -853,9 +854,11 @@ create <- function(
   gene.attrs = NULL,
   cell.attrs = NULL,
   layers = NULL,
-  chunk.dims = 'auto'
+  chunk.dims = 'auto',
+  overwrite = FALSE
 ) {
-  if (file.exists(filename)) {
+  mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
+  if (file.exists(filename) && !overwrite) {
     stop(paste('File', file, 'already exists!'))
   }
   if (!is.matrix(x = data)) {
@@ -870,7 +873,7 @@ create <- function(
   } else {
     chunk.dims <- as.integer(x = chunk.dims)
   }
-  new.loom <- loom$new(filename = filename, mode = 'w-')
+  new.loom <- loom$new(filename = filename, mode = mode)
   # Create the matrix
   new.loom$create_dataset(
     name = 'matrix',
@@ -992,6 +995,115 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
     stop("'mode' must be one of 'r' or 'r+'")
   }
   new.loom <- loom$new(filename = filename, mode = mode, skip.validate = skip.validate)
+  return(new.loom)
+}
+
+#' Subset a loom file
+#'
+#' @param x A loom object
+#' @param m Rows (genes) to subset
+#' @param n Columns (cells) to subset
+#' @param filename Filename for new loom object
+#' @param overwrite Overwrite \code{filename} if already exists?
+#' @param display.progress Display progress as we're copying over data
+#'
+#' @return A loom object connected to \code{filename}
+#'
+#' @importFrom utils txtProgressBar setTxtProgressBar
+#'
+#' @export subset.loom
+#' @method subset loom
+#'
+subset.loom <- function(
+  x,
+  m,
+  n,
+  filename,
+  overwrite = FALSE,
+  display.progress = TRUE,
+  ...
+) {
+  new.pb <- function() {return(txtProgressBar(style = 3, char = '='))}
+  # # Set mode based on
+  # mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
+  # Ensure that m and n are within the bounds of the loom file
+  if (max(m) > x$shape[1] || max(n) > x$shape[2]) {
+    stop(paste(
+      "'m' and 'n' must be less than",
+      self$shape[1],
+      "and",
+      self$shape[2],
+      "respectively"
+    ))
+  }
+  extension <- rev(x = unlist(x = strsplit(x = filename, split = '.', fixed = TRUE)))
+  # Ensure that we call our new file a loom file
+  if (extension != 'loom') {
+    filename <- paste0(filename, '.loom')
+  }
+  if (display.progress) {
+    cat("Writing new loom file to", filename, '\n')
+  }
+  # Make the loom file
+  new.loom <- create(
+    filename = filename,
+    data = t(x = x[['matrix']][n, m]),
+    overwrite = overwrite
+  )
+  # Add row attributes
+  row.attrs <- list.datasets(object = x, path = 'row_attrs', full.names = TRUE)
+  if (length(x = row.attrs) > 0) {
+    if (display.progress) {
+      cat("\nAdding", length(x = row.attrs), "row attributes\n")
+      pb <- new.pb()
+      counter <- 0
+    }
+    for (row.attr in row.attrs) {
+      new.loom$add.row.attribute(attribute = x[[row.attr]][m])
+      if (display.progress) {
+        counter <- counter + 1
+        setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
+      }
+    }
+  } else {
+    warning("No row attributes found")
+  }
+  # Add col attributes
+  col.attrs <- list.datasets(object = x, path = 'col_attrs', full.names = TRUE)
+  if (length(x = col.attrs) > 0) {
+    if (display.progress) {
+      cat("\nAdding", length(x = col.attrs), "row attributes\n")
+      pb <- new.pb()
+      counter <- 0
+    }
+    for (col.attr in col.attrs) {
+      new.loom$add.col.attribute(attribute = x[[col.attr]][n])
+      if (display.progress) {
+        counter <- counter + 1
+        setTxtProgressBar(pb = pb, value = counter / length(x = col.attrs))
+      }
+    }
+  } else {
+    warning("No column attributes found")
+  }
+  # Add layers
+  layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
+  if (length(x = layers) > 0) {
+    if (display.progress) {
+      cat("\nAdding", length(x = layers), "row attributes\n")
+      pb <- new.pb()
+      counter <- 0
+    }
+    for (layer in layers) {
+      new.loom$add.layer(layers = x[[layer]][n, m])
+      if (display.progress) {
+        counter <- counter + 1
+        setTxtProgressBar(pb = pb, value = counter / length(x = layers))
+      }
+    }
+  } else {
+    warning("No layers found")
+  }
   return(new.loom)
 }
 
