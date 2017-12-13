@@ -1014,8 +1014,9 @@ subset.loom <- function(
       counter <- 0
     }
     for (row.attr in row.attrs) {
-      base.row <- basename(path = row.attr)
-      new.loom$add.row.attribute(attribute = list(base.row = x[[row.attr]][m]))
+      row.list <- list(x[[row.attr]][m])
+      names(x = row.list) <- basename(path = row.attr)
+      new.loom$add.row.attribute(attribute = row.list)
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
@@ -1033,8 +1034,9 @@ subset.loom <- function(
       counter <- 0
     }
     for (col.attr in col.attrs) {
-      base.col <- basename(path = col.attr)
-      new.loom$add.col.attribute(attribute = list(base.col = x[[col.attr]][n]))
+      col.list <- list(x[[col.attr]][n])
+      names(x = col.list) <- basename(path = col.attr)
+      new.loom$add.col.attribute(attribute = col.list)
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = col.attrs))
@@ -1052,8 +1054,9 @@ subset.loom <- function(
       counter <- 0
     }
     for (layer in layers) {
-      base.layer <- basename(path = layer)
-      new.loom$add.layer(layers = list(base.layer = x[[layer]][n, m]))
+      layer.list <- list(x[[layer]][n, m])
+      names(x = layer.list) <- basename(path = layer)
+      new.loom$add.layer(layers = layer.list)
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = layers))
