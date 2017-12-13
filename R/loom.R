@@ -1001,7 +1001,8 @@ subset.loom <- function(
   # Make the loom file
   new.loom <- create(
     filename = filename,
-    data = t(x = x[['matrix']][n, m]),
+    # data = t(x = x[['matrix']][n, m]),
+    data = x[['matrix']][n, m],
     overwrite = overwrite
   )
   # Add row attributes
