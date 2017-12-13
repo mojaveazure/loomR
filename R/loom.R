@@ -944,9 +944,9 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' Subset a loom file
 #'
 #' @param x A loom object
-#' @param m Rows (genes) to subset
-#' @param n Columns (cells) to subset
-#' @param filename Filename for new loom object
+#' @param m Rows (genes) to subset, defaults to all rows
+#' @param n Columns (cells) to subset, defaults to all columns
+#' @param filename Filename for new loom object, defaults to ...
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress as we're copying over data
 #'
@@ -959,23 +959,34 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #'
 subset.loom <- function(
   x,
-  m,
-  n,
-  filename,
+  m = NULL,
+  n = NULL,
+  filename = NULL,
   overwrite = FALSE,
   display.progress = TRUE,
   ...
 ) {
   new.pb <- function() {return(txtProgressBar(style = 3, char = '='))}
-  # # Set mode based on
-  # mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
+  # Set some defaults
+  if (is.null(x = m)) {
+    m <- 1:x$shape[1]
+  }
+  if (is.null(x = n)) {
+    n <- 1:x$shape[2]
+  }
+  if (is.null(x = filename)) {
+    filename <- paste(
+      unlist(x = strsplit(x = lfile$filename, split = '.', fixed = TRUE)),
+      collapse = '_subset.'
+    )
+  }
   # Ensure that m and n are within the bounds of the loom file
   if (max(m) > x$shape[1] || max(n) > x$shape[2]) {
     stop(paste(
       "'m' and 'n' must be less than",
-      self$shape[1],
+      x$shape[1],
       "and",
-      self$shape[2],
+      x$shape[2],
       "respectively"
     ))
   }

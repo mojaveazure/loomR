@@ -4,17 +4,17 @@
 \alias{subset.loom}
 \title{Subset a loom file}
 \usage{
-\method{subset}{loom}(x, m, n, filename, overwrite = FALSE,
-  display.progress = TRUE, ...)
+\method{subset}{loom}(x, m = NULL, n = NULL, filename = NULL,
+  overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
 \item{x}{A loom object}
 
-\item{m}{Rows (genes) to subset}
+\item{m}{Rows (genes) to subset, defaults to all rows}
 
-\item{n}{Columns (cells) to subset}
+\item{n}{Columns (cells) to subset, defaults to all columns}
 
-\item{filename}{Filename for new loom object}
+\item{filename}{Filename for new loom object, defaults to ...}
 
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
