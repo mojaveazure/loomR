@@ -860,7 +860,7 @@ create <- function(
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
   if (file.exists(filename) && !overwrite) {
-    stop(paste('File', file, 'already exists!'))
+    stop(paste('File', filename, 'already exists!'))
   }
   if (!is.matrix(x = data)) {
     data <- as.matrix(x = data)
