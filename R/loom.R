@@ -1013,7 +1013,8 @@ subset.loom <- function(
       counter <- 0
     }
     for (row.attr in row.attrs) {
-      new.loom$add.row.attribute(attribute = x[[row.attr]][m])
+      base.row <- basename(path = row.attr)
+      new.loom$add.row.attribute(attribute = base.row = x[[row.attr]][m]))
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
@@ -1031,7 +1032,8 @@ subset.loom <- function(
       counter <- 0
     }
     for (col.attr in col.attrs) {
-      new.loom$add.col.attribute(attribute = x[[col.attr]][n])
+      base.col <- basename(path = col.attr)
+      new.loom$add.col.attribute(attribute = list(base.col = x[[col.attr]][n]))
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = col.attrs))
@@ -1049,7 +1051,8 @@ subset.loom <- function(
       counter <- 0
     }
     for (layer in layers) {
-      new.loom$add.layer(layers = x[[layer]][n, m])
+      base.layer <- basename(path = layer)
+      new.loom$add.layer(layers = list(base.layer = x[[layer]][n, m]))
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = layers))
@@ -1058,6 +1061,7 @@ subset.loom <- function(
   } else {
     warning("No layers found")
   }
+  new.loom$flush()
   return(new.loom)
 }
 
