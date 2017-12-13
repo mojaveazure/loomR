@@ -20,7 +20,7 @@ A class for loom files
 \describe{
 \item{\code{version}}{Version of loomR object was created under}
 
-\item{\code{shape}}{Shape of \code{/matrix} in columns (cells) by rows (genes)}
+\item{\code{shape}}{Shape of \code{/matrix} in rows (genes) by cells (columns)}
 
 \item{\code{chunksize}}{Chunks set for this dataset in columns (cells) by rows (genes)}
 

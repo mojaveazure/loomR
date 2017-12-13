@@ -14,7 +14,7 @@ NULL
 #' @seealso \code{\link{hdf5r::H5File}}
 #'
 #' @field version Version of loomR object was created under
-#' @field shape Shape of \code{/matrix} in columns (cells) by rows (genes)
+#' @field shape Shape of \code{/matrix} in rows (genes) by cells (columns)
 #' @field chunksize Chunks set for this dataset in columns (cells) by rows (genes)
 #' @field matrix The main data matrix, stored as columns (cells) by rows (genes)
 #' @field layers Additional data matricies, the same shape as \code{/matrix}
@@ -112,7 +112,7 @@ loom <- R6Class(
         } else {
           self$matrix <- self[['matrix']]
         }
-        self$shape <- self[['matrix']]$dims
+        self$shape <- rev(self[['matrix']]$dims)
         # Store the chunk size
         chunks <- h5attr(x = self, which = 'chunks')
         chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
@@ -172,15 +172,16 @@ loom <- R6Class(
           layers[[i]] <- as.matrix(x = layers[[i]])
         }
         do.transpose <- FALSE
-        if (any(dim(x = layers[[i]]) != self$shape)) {
-          if (all(rev(x = dim(x = layers[[i]])) == self$shape)) {
+        shape.use <- rev(x = self$shape)
+        if (any(dim(x = layers[[i]]) != shape.use)) {
+          if (all(rev(x = dim(x = layers[[i]])) == shape.use)) {
             do.transpose <- TRUE
           } else {
             stop(paste(
               "All layers must have",
-              self$shape[1],
+              shape.use[1],
               "rows for cells and",
-              self$shape[2],
+              shape.use[2],
               "columns for genes"
             ))
           }
@@ -244,7 +245,7 @@ loom <- R6Class(
       grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
       grp <- self[[grp.name]]
       for (i in 1:length(x = attribute)) {
-        if (length(attribute[[i]]) != rev(x = self$shape)[MARGIN])
+        if (length(attribute[[i]]) != self$shape[MARGIN])
           stop(paste(
             "All",
             switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
@@ -806,7 +807,7 @@ loom <- R6Class(
       }
       if (is.null(x = index.use)) {
         # If no index was provided, use entire range for this margin
-        index.use <- c(1, rev(x = self$shape)[private$iter.margin])
+        index.use <- c(1, self$shape[private$iter.margin])
       } else if (length(x = index.use) == 1) {
         # If one index was provided, start at one and go to index
         index.use <- c(1, index.use)
@@ -816,7 +817,7 @@ loom <- R6Class(
       }
       # Ensure the indices provided fit within the range of the dataset
       index.use[1] <- max(1, index.use[1])
-      index.use[2] <- min(index.use[2], rev(x = self$shape)[private$iter.margin])
+      index.use[2] <- min(index.use[2], self$shape[private$iter.margin])
       # Ensure that index.use[1] is greater than index.use[2]
       if (index.use[1] > index.use[2]) {
         stop(paste0(
@@ -882,7 +883,7 @@ create <- function(
     chunk_dims = chunk.dims
   )
   new.loom$matrix <- new.loom[['matrix']]
-  new.loom$shape <- new.loom[['matrix']]$dims
+  new.loom$shape <- rev(x = new.loom[['matrix']]$dims)
   # Groups
   new.loom$create_group(name = 'layers')
   new.loom$create_group(name = 'row_attrs')
@@ -980,6 +981,12 @@ subset.loom <- function(
       collapse = '_subset.'
     )
   }
+  if (length(x = m) == 1) {
+    m <- 1:m
+  }
+  if (length(x = n) == 1) {
+    n <- 1:n
+  }
   # Ensure that m and n are within the bounds of the loom file
   if (max(m) > x$shape[1] || max(n) > x$shape[2]) {
     stop(paste(
@@ -990,7 +997,7 @@ subset.loom <- function(
       "respectively"
     ))
   }
-  extension <- rev(x = unlist(x = strsplit(x = filename, split = '.', fixed = TRUE)))
+  extension <- rev(x = unlist(x = strsplit(x = filename, split = '.', fixed = TRUE)))[1]
   # Ensure that we call our new file a loom file
   if (extension != 'loom') {
     filename <- paste0(filename, '.loom')
