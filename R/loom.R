@@ -1014,7 +1014,7 @@ subset.loom <- function(
     }
     for (row.attr in row.attrs) {
       base.row <- basename(path = row.attr)
-      new.loom$add.row.attribute(attribute = base.row = x[[row.attr]][m]))
+      new.loom$add.row.attribute(attribute = list(base.row = x[[row.attr]][m]))
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
