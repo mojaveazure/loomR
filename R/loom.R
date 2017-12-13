@@ -1036,7 +1036,7 @@ subset.loom <- function(
   col.attrs <- list.datasets(object = x, path = 'col_attrs', full.names = TRUE)
   if (length(x = col.attrs) > 0) {
     if (display.progress) {
-      cat("\nAdding", length(x = col.attrs), "row attributes\n")
+      cat("\nAdding", length(x = col.attrs), "column attributes\n")
       pb <- new.pb()
       counter <- 0
     }
@@ -1056,7 +1056,7 @@ subset.loom <- function(
   layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
   if (length(x = layers) > 0) {
     if (display.progress) {
-      cat("\nAdding", length(x = layers), "row attributes\n")
+      cat("\nAdding", length(x = layers), "layers\n")
       pb <- new.pb()
       counter <- 0
     }
