@@ -19,9 +19,10 @@ Depends:
 Imports:
   utils,
   methods
-Collate:
-  'loom.R'
-  'package.R'
+Collate: 
+    'internal.R'
+    'loom.R'
+    'package.R'
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
