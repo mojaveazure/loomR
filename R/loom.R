@@ -688,29 +688,63 @@ loom <- R6Class(
     },
     # Functions that modify `/matrix'
     add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
+      if (self$mode == 'r') {
+        stop("Cannot modify the loom file in read-only mode")
+      }
       # matrix.data is a vector of data for one cell or a list of data for several cells
       # each entry in matrix.data must be the same length as number of genes
       # attributes.data is an optional list or vector (with optional names) for col_attrs
       # each entry in col_attrs must be the same length as the number of cells being added (NAs added for those that aren't)
       # layers.data is an optional list (with optional names) for layers
       # each entry in layers.data must be an N by M matrix where N is the number of genes and M is the number of cells
-      if (is.vector(x = matrix.data) && !is.list(x = matrix.data)) {
+      ##########################################################################
+      # Handle times when matrix.data exists as a vector of data for one cell
+      # Also handle matrix.data as matrix or dataframe
+      if ((is.vector(x = matrix.data) || is.factor(x = matrix.data)) && !is.list(x = matrix.data)) {
         matrix.data <- list(matrix.data)
+      } else if (is.matrix(x = matrix.data) || is.data.frame(x = matrix.data)) {
+        matrix.data <- as.list(x = as.data.frame(x = matrix.data))
       }
+      # Check that all inputs are lists
       list.check <- vapply(
         X = list(matrix.data, attributes.data, layers.data),
-        FUN = is.list,
+        FUN = function(x) {
+          return(is.list(x = x) || is.null(x = x))
+        },
         FUN.VALUE = logical(length = 1L)
       )
       if (!all(list.check)) {
         stop("'matrix.data', 'attributes.data', and 'layers.data' must be lists")
       }
+      # Check that all components of matrix.data contain the same number of genes the loom file
+      length.check <- vapply(
+        X = matrix.data,
+        FUN = function(x) {
+          return(length(x = x) == self$shape[2])
+        },
+        FUN.VALUE = logical(length = 1L)
+      )
+      if (!all(length.check)) {
+        stop(paste(
+          "All values passed to matrix.data must have a length of",
+          self$shape[2]
+        ))
+      }
+      # Figure out the maximum number of cells we're adding
+      # matrix.data: one cell per entry, Mcells = length(x = matrix.data)
+      # attributes.data: one attribute per entry, multiple cells per entry:
+      #   Mcells = sapply(x = attributes.data, FUN = length)
+      # layers.data: one layer per entry, multiple cells per layer:
+      #   Mcells = sapply(X = layers.data, FUN = length) if each entry is not a matrix
+      #   Otherwise, Mcells = sapply(X = layers.data, FUN = ncol)
       lengths <- vector(
         mode = 'integer',
         length = 1 + length(x = attributes.data) + length(x = layers.data)
       )
+      # Find Mcells for matrix.data
       lengths[1] <- length(x = matrix.data)
       attributes.end <- 1 + length(x = attributes.data)
+      # Find Mcells for attributes.data
       if (attributes.end != 1) {
         lengths[2:attributes.end] <- vapply(
           X = attributes.data,
@@ -719,18 +753,59 @@ loom <- R6Class(
         )
       }
       if (attributes.end != length(x = lengths)) {
+        # Find Mcells for layers.data
         lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
           X = layers.data,
-          FUN = length,
+          FUN = function(x) {
+            # Mcells for matrix/data.frame entries
+            if (is.matrix(x = x) || is.data.frame(x = x)) {
+              check = nrow(x = x)
+              ret = ncol(x = x)
+            } else {
+              # Mcells for lists/vectors, cannot have a list of lists
+              check = length(x = x)
+              ret = 1L
+            }
+            # Check that each entry provides Ngenes entries
+            if (check != self$shape[2]) {
+              stop("Layer additions must have datapoints for all genes")
+            } else {
+              return(ret)
+            }
+          },
           FUN.VALUE = integer(length = 1L)
         )
       }
+      # Get the maximum number of cells we're adding
       num.cells.added <- max(lengths)
-      return(num.cells.added)
+      # Fill out everything else with NAs
+      # matrix.data <- c(
+      #   matrix.data,
+      #   rep.int(
+      #     x = list(rep.int(x = NA, times = self$shape[2])),
+      #     times = num.cells.added - length(x = self$shape[2])
+      #   )
+      # )
+      datasets.check <- c(
+        'matrix',
+        grep(pattern = 'layers', x = list.datasets(object = self), value = TRUE)
+      )
+      max.check <- vapply(
+        X = datasets.check,
+        FUN = function(dset, ncells) {
+          return((self[[dset]]$dims[1] + ncells) > self[[dset]]$maxdims[1])
+        },
+        FUN.VALUE = logical(length = 1L),
+        ncells = num.cells.added
+      )
+      if (any(max.check)) {
+        stop()
+      }
+      # # Load layers and attributes
       # private$load_layers()
       # private$load_attributes(MARGIN = 1)
       # private$load_attributes(MARGIN = 2)
-      return(lengths)
+      self$shape <- self[['matrix']]$dims
     }
     # add.loom = function() {}
   ),
