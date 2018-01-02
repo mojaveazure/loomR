@@ -14,7 +14,7 @@ NULL
 #' @seealso \code{\link{hdf5r::H5File}}
 #'
 #' @field version Version of loomR object was created under
-#' @field shape Shape of \code{/matrix} in rows (genes) by cells (columns)
+#' @field shape Shape of \code{/matrix} in genes (columns) by cells (rows)
 #' @field chunksize Chunks set for this dataset in columns (cells) by rows (genes)
 #' @field matrix The main data matrix, stored as columns (cells) by rows (genes)
 #' @field layers Additional data matricies, the same shape as \code{/matrix}
@@ -55,6 +55,15 @@ NULL
 #'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
 #'     Map a function onto a dataset within the loom file, returns the result into R.
 #'     The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
+#'   }
+#'   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
+#'     Add m2 cells to a loom file.
+#'     \describe{
+#'       \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+#'       \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
+#'       \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \cpde{self[['layers]]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+#'       \item{\code{display.progress}}{display progress}
+#'     }
 #'   }
 #' }
 #'
@@ -687,125 +696,86 @@ loom <- R6Class(
       return(results)
     },
     # Functions that modify `/matrix'
-    add.cells = function(matrix.data, attributes.data = NULL, layers.data = NULL) {
+    add.cells = function(
+      matrix.data,
+      attributes.data = NULL,
+      layers.data = NULL,
+      display.progress = TRUE
+    ) {
       if (self$mode == 'r') {
         stop("Cannot modify the loom file in read-only mode")
       }
-      # matrix.data is a vector of data for one cell or a list of data for several cells
-      # each entry in matrix.data must be the same length as number of genes
-      # attributes.data is an optional list or vector (with optional names) for col_attrs
-      # each entry in col_attrs must be the same length as the number of cells being added (NAs added for those that aren't)
-      # layers.data is an optional list (with optional names) for layers
-      # each entry in layers.data must be an N by M matrix where N is the number of genes and M is the number of cells
-      ##########################################################################
-      # Handle times when matrix.data exists as a vector of data for one cell
-      # Also handle matrix.data as matrix or dataframe
-      if ((is.vector(x = matrix.data) || is.factor(x = matrix.data)) && !is.list(x = matrix.data)) {
-        matrix.data <- list(matrix.data)
-      } else if (is.matrix(x = matrix.data) || is.data.frame(x = matrix.data)) {
-        matrix.data <- as.list(x = as.data.frame(x = matrix.data))
+      # Check inputs
+      n <- self[['matrix']]$dims[2]
+      if (display.progress) {
+        cat("Checking inputs...\n", file = stderr())
       }
-      # Check that all inputs are lists
-      list.check <- vapply(
-        X = list(matrix.data, attributes.data, layers.data),
-        FUN = function(x) {
-          return(is.list(x = x) || is.null(x = x))
-        },
-        FUN.VALUE = logical(length = 1L)
+      matrix.data <- check.matrix_data(x = matrix.data, n = n)
+      layers.data <- check.layers(
+        x = layers.data,
+        n = n,
+        layers.names = names(x = self[['layers']])
       )
-      if (!all(list.check)) {
-        stop("'matrix.data', 'attributes.data', and 'layers.data' must be lists")
+      attributes.data <- check.col_attrs(
+        x = attributes.data,
+        attrs.names = names(x = self[['col_attrs']])
+      )
+      # Get the number of cells we're adding
+      num.cells <- c(
+        nCells.matrix_data(x = matrix.data),
+        nCells.layers(x = layers.data),
+        nCells.col_attrs(x = attributes.data)
+      )
+      num.cells <- max(num.cells)
+      # Flesh out the input data to add
+      if (display.progress) {
+        cat(paste("Adding", num.cells, "to this loom file\n"), file = stderr())
       }
-      # Check that all components of matrix.data contain the same number of genes the loom file
-      length.check <- vapply(
-        X = matrix.data,
-        FUN = function(x) {
-          return(length(x = x) == self$shape[2])
-        },
-        FUN.VALUE = logical(length = 1L)
-      )
-      if (!all(length.check)) {
-        stop(paste(
-          "All values passed to matrix.data must have a length of",
-          self$shape[2]
-        ))
+      matrix.data <- addCells.matrix_data(x = matrix.data, n = n, m2 = num.cells)
+      layers.data <- addCells.layers(x = layers.data, n = n, m2 = num.cells)
+      attributes.data <- addCells.col_attrs(x = attributes.data, m2 = num.cells)
+      # Add the input to the loom file
+      dims.fill <- self[['matrix']]$dims[1]
+      dims.fill <- (dims.fill + 1L):(dims.fill + num.cells)
+      # Matrix data
+      if (display.progress) {
+        cat("Adding data to /matrix\n", file = stderr())
       }
-      # Figure out the maximum number of cells we're adding
-      # matrix.data: one cell per entry, Mcells = length(x = matrix.data)
-      # attributes.data: one attribute per entry, multiple cells per entry:
-      #   Mcells = sapply(x = attributes.data, FUN = length)
-      # layers.data: one layer per entry, multiple cells per layer:
-      #   Mcells = sapply(X = layers.data, FUN = length) if each entry is not a matrix
-      #   Otherwise, Mcells = sapply(X = layers.data, FUN = ncol)
-      lengths <- vector(
-        mode = 'integer',
-        length = 1 + length(x = attributes.data) + length(x = layers.data)
-      )
-      # Find Mcells for matrix.data
-      lengths[1] <- length(x = matrix.data)
-      attributes.end <- 1 + length(x = attributes.data)
-      # Find Mcells for attributes.data
-      if (attributes.end != 1) {
-        lengths[2:attributes.end] <- vapply(
-          X = attributes.data,
-          FUN = length,
-          FUN.VALUE = integer(length = 1L)
-        )
+      matrix.data <- t(x = as.matrix(x = data.frame(matrix.data)))
+      self[['matrix']][dims.fill, ] <- matrix.data
+      # Layer data
+      if (display.progress) {
+        cat("Adding data to /layers\n", file = stderr())
+        pb <- new.pb()
+        counter <- 0
       }
-      if (attributes.end != length(x = lengths)) {
-        # Find Mcells for layers.data
-        lengths[(attributes.end + 1):length(x = lengths)] <- vapply(
-          X = layers.data,
-          FUN = function(x) {
-            # Mcells for matrix/data.frame entries
-            if (is.matrix(x = x) || is.data.frame(x = x)) {
-              check = nrow(x = x)
-              ret = ncol(x = x)
-            } else {
-              # Mcells for lists/vectors, cannot have a list of lists
-              check = length(x = x)
-              ret = 1L
-            }
-            # Check that each entry provides Ngenes entries
-            if (check != self$shape[2]) {
-              stop("Layer additions must have datapoints for all genes")
-            } else {
-              return(ret)
-            }
-          },
-          FUN.VALUE = integer(length = 1L)
-        )
+      layers.names <- names(x = self[['layers']])
+      for (i in layers.names) {
+        self[['layers', i]][dims.fill, ] <- t(x = layers.data[[i]])
+        if (display.progress) {
+          counter <- counter + 1
+          setTxtProgressBar(pb = pb, value = counter / length(x = layers.names))
+        }
       }
-      # Get the maximum number of cells we're adding
-      num.cells.added <- max(lengths)
-      # Fill out everything else with NAs
-      # matrix.data <- c(
-      #   matrix.data,
-      #   rep.int(
-      #     x = list(rep.int(x = NA, times = self$shape[2])),
-      #     times = num.cells.added - length(x = self$shape[2])
-      #   )
-      # )
-      datasets.check <- c(
-        'matrix',
-        grep(pattern = 'layers', x = list.datasets(object = self), value = TRUE)
-      )
-      max.check <- vapply(
-        X = datasets.check,
-        FUN = function(dset, ncells) {
-          return((self[[dset]]$dims[1] + ncells) > self[[dset]]$maxdims[1])
-        },
-        FUN.VALUE = logical(length = 1L),
-        ncells = num.cells.added
-      )
-      if (any(max.check)) {
-        stop()
+      # Column attributes
+      if (display.progress) {
+        cat("Adding data to /col_attrs\n", file = stderr())
+        pb <- new.pb()
+        counter <- 0
+      }
+      attrs.names <- names(x = self[['col_attrs']])
+      for (i in attrs.names) {
+        self[['col_attrs', i]][dims.fill] <- attributes.data[[i]]
+        if (display.progress) {
+          counter <- counter + 1
+          setTxtProgressBar(pb = pb, value = counter / length(x = attrs.names))
+        }
       }
       # # Load layers and attributes
       # private$load_layers()
       # private$load_attributes(MARGIN = 1)
       # private$load_attributes(MARGIN = 2)
-      self$shape <- self[['matrix']]$dims
+      # self$shape <- self[['matrix']]$dims
     }
     # add.loom = function() {}
   ),
@@ -1028,7 +998,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #'
 #' @return A loom object connected to \code{filename}
 #'
-#' @importFrom utils txtProgressBar setTxtProgressBar
+#' @importFrom utils setTxtProgressBar
 #'
 #' @export subset.loom
 #' @method subset loom
@@ -1042,7 +1012,6 @@ subset.loom <- function(
   display.progress = TRUE,
   ...
 ) {
-  new.pb <- function() {return(txtProgressBar(style = 3, char = '='))}
   # Set some defaults
   if (is.null(x = m)) {
     m <- 1:x$shape[1]
@@ -1052,7 +1021,7 @@ subset.loom <- function(
   }
   if (is.null(x = filename)) {
     filename <- paste(
-      unlist(x = strsplit(x = lfile$filename, split = '.', fixed = TRUE)),
+      unlist(x = strsplit(x = x$filename, split = '.', fixed = TRUE)),
       collapse = '_subset.'
     )
   }

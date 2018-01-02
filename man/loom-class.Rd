@@ -20,7 +20,7 @@ A class for loom files
 \describe{
 \item{\code{version}}{Version of loomR object was created under}
 
-\item{\code{shape}}{Shape of \code{/matrix} in rows (genes) by cells (columns)}
+\item{\code{shape}}{Shape of \code{/matrix} in genes (columns) by cells (rows)}
 
 \item{\code{chunksize}}{Chunks set for this dataset in columns (cells) by rows (genes)}
 
@@ -68,6 +68,15 @@ A class for loom files
   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
     Map a function onto a dataset within the loom file, returns the result into R.
     The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
+  }
+  \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
+    Add m2 cells to a loom file.
+    \describe{
+      \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+      \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
+      \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \cpde{self[['layers]]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+      \item{\code{display.progress}}{display progress}
+    }
   }
 }
 }
