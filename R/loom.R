@@ -166,14 +166,14 @@ loom <- R6Class(
     # Addding attributes and layers
     add.layer = function(layers, overwrite = FALSE) {
       if (self$mode == 'r') {
-        stop("Cannot add a layer in read-only mode")
+        stop(private$err_mode)
       }
       # Value checking
       if (!is.list(x = layers) || is.null(x = names(x = layers))) {
         stop("'layers' must be a named list")
       }
       if (is.null(x = self$shape)) {
-        stop(private$err_msg)
+        stop(private$err_init)
       }
       # Add layers
       for (i in 1:length(x = layers)) {
@@ -222,7 +222,7 @@ loom <- R6Class(
     },
     add.attribute = function(attribute, MARGIN, overwrite = FALSE) {
       if (self$mode == 'r') {
-        stop("Cannot add attributes in read-only mode")
+        stop(private$err_mode)
       }
       # Value checking
       if (is.data.frame(x = attribute)) {
@@ -249,7 +249,7 @@ loom <- R6Class(
       }
       # Add the attributes as datasets for our MARGIN's group
       if (is.null(x = self$shape)) {
-        stop(private$err_msg)
+        stop(private$err_init)
       }
       grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
       grp <- self[[grp.name]]
@@ -292,6 +292,7 @@ loom <- R6Class(
       self$add.col.attribute(attribute = meta.data, overwrite = overwrite)
       invisible(x = self)
     },
+    # Get attribute information
     get.attribute.df = function(
       attribute.layer = c("row", "col"),
       attribute.names = NULL,
@@ -314,7 +315,7 @@ loom <- R6Class(
         invalid.names <- attribute.names[which(!attribute.names %in% self[[attribute.layer]]$names)]
         stop(paste0("Invalid attribute.names: ", paste0(invalid.names, collapse = ", ")))
       }
-      if(attribute.layer == "row_attrs") {
+      if (attribute.layer == "row_attrs") {
         combined.df <- data.frame(
           self[[paste0(attribute.layer, "/", attribute.names[1])]][],
           row.names = self[[paste0(attribute.layer, "/", row.names)]][]
@@ -439,7 +440,7 @@ loom <- R6Class(
       ...
     ) {
       if (self$mode == 'r') {
-        stop("Cannot write to disk in read-only mode")
+        stop(private$err_mode)
       }
       if (!inherits(x = FUN, what = 'function')) {
         stop("FUN must be a function")
@@ -503,7 +504,7 @@ loom <- R6Class(
           # Do a trial run to figure out the class of NAs
           na.use <- NA
           if (display.progress) {
-            cat("Running trial to determine class of NAs\n")
+            catn("Running trial to determine class of NAs")
           }
           trial <- switch(
             EXPR = MARGIN,
@@ -703,12 +704,12 @@ loom <- R6Class(
       display.progress = TRUE
     ) {
       if (self$mode == 'r') {
-        stop("Cannot modify the loom file in read-only mode")
+        stop(private$err_mode)
       }
       # Check inputs
       n <- self[['matrix']]$dims[2]
       if (display.progress) {
-        cat("Checking inputs...\n", file = stderr())
+        cate("Checking inputs...")
       }
       matrix.data <- check.matrix_data(x = matrix.data, n = n)
       layers.data <- check.layers(
@@ -729,7 +730,7 @@ loom <- R6Class(
       num.cells <- max(num.cells)
       # Flesh out the input data to add
       if (display.progress) {
-        cat(paste("Adding", num.cells, "to this loom file\n"), file = stderr())
+        cate(paste("Adding", num.cells, "to this loom file"))
       }
       matrix.data <- addCells.matrix_data(x = matrix.data, n = n, m2 = num.cells)
       layers.data <- addCells.layers(x = layers.data, n = n, m2 = num.cells)
@@ -739,13 +740,13 @@ loom <- R6Class(
       dims.fill <- (dims.fill + 1L):(dims.fill + num.cells)
       # Matrix data
       if (display.progress) {
-        cat("Adding data to /matrix\n", file = stderr())
+        cate("Adding data to /matrix")
       }
       matrix.data <- t(x = as.matrix(x = data.frame(matrix.data)))
       self[['matrix']][dims.fill, ] <- matrix.data
       # Layer data
       if (display.progress) {
-        cat("Adding data to /layers\n", file = stderr())
+        cate("Adding data to /layers")
         pb <- new.pb()
         counter <- 0
       }
@@ -759,7 +760,7 @@ loom <- R6Class(
       }
       # Column attributes
       if (display.progress) {
-        cat("Adding data to /col_attrs\n", file = stderr())
+        cate("Adding data to /col_attrs")
         pb <- new.pb()
         counter <- 0
       }
@@ -776,13 +777,16 @@ loom <- R6Class(
       # private$load_attributes(MARGIN = 1)
       # private$load_attributes(MARGIN = 2)
       # self$shape <- self[['matrix']]$dims
-    }
+    },
     add.loom = function(
       other,
-      gene.names = NULL,
-      self.gene.names = NULL,
+      other.key = NULL,
+      self.key = NULL,
       ...
     ) {
+      if (self$mode == 'r') {
+        stop(private$err_mode)
+      }
       # Connect to the other loom file
       if (inherits(x = other, what = 'loom')) {
         ofile <- other
@@ -791,30 +795,40 @@ loom <- R6Class(
       } else {
         stop("'other' must be either a loom object or a path to a loom file")
       }
-      # Key matching
-      if (!is.null(x = gene.names) && !is.null(x = self.gene.names)) {
-        gene.names <- basename(path = gene.names)
-        self.gene.names <- basename(path = self.gene.names)
-        name.check <- c(
-          gene.names %in% names(x = other[['row_attrs']]),
-          self.gene.names %in% names(x = other[['row_attrs']])
-        )
-        name.check <- !name.check
-        if (any(name.check)) {
-          if (is.character(x = other)) {
-            ofile$close_all()
+      # If we have row keys to use
+      if (!is.null(x = other.key) && !is.null(x = self.key)) {
+        other.key <- basename(path = other.key)
+        self.key <- basename(path = self.key)
+        tryCatch(
+          expr = other.key <- other[['row_attrs']][[other.key]][],
+          error = function(e) {
+            if (is.character(x = other)) {
+              ofile$close
+            }
+            stop("Failed to find the gene names dataset in the other loom file")
           }
-          failed.check <- which(x = name.check)[1]
-          stop(paste0(
-            "Failed to find the '",
-            paste0('row_attrs/', c(gene.names, self.gene.names)[failed.check]),
-            "' dataset in ",
-            switch(EXPR = failed.check, '1' = 'the other', '2' = 'this'),
-            " loom file"
-          ))
-        }
-        gene.names <- other[['row_attrs']][[gene.names]][]
-        self.gene.names <- self[['row_attrs']][[self.gene.names]][]
+        )
+        tryCatch(
+          expr = self.key <- self[['row_attrs']][[self.key]][],
+          error = function(e) {
+            if (is.character(x = other)) {
+              ofile$close
+            }
+            stop("Failed to find the gene names dataset in this loom file")
+          }
+        )
+        # Match rows
+        rows.use <- match(x = other.key, table = self.key, nomatch = 0)
+        rows.use <- rows.use[rows.use > 0]
+      } else {
+        cate("Adding the loom file as-is, assuming in the correct order")
+        Sys.sleep(time = 3)
+        rows.use <- 1:other[['matrix']]$dims[2]
+      }
+      if (max(rows.use) > self[['matrix']]$dims[2]) {
+        stop("More genes in the other loom file than present in this one")
+      } else if (max(rows.use) < self[['matrix']]$dims[2]) {
+        cate("...")
       }
       # Clean up
       if (is.character(x = other)) {
@@ -823,11 +837,13 @@ loom <- R6Class(
     }
   ),
   # Private fields and methods
-  # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
+  # @field err_init An error message for if this object hasn't been created with loomR::create or loomR::connect
+  # @field err_mode An error message for if this object is in read-only mode
   # @field it Iterator object for batch.scan and batch.next
   # @field iter.dataset Dataset for iterating on
   # @field iter.margin Margin to iterate over
-  # @field iter.index # Index values for iteration
+  # @field iter.index Index values for iteration
+  # @field skipped.validation Was validation skipped?
   # \describe{
   #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
@@ -836,7 +852,8 @@ loom <- R6Class(
   # }
   private = list(
     # Fields
-    err_msg = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
+    err_init = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
+    err_mode = "Cannot modify a loom file in read-only mode",
     it = NULL,
     iter.chunksize = NULL,
     iter.dataset = NULL,
@@ -1090,7 +1107,7 @@ subset.loom <- function(
     filename <- paste0(filename, '.loom')
   }
   if (display.progress) {
-    cat("Writing new loom file to", filename, '\n')
+    catn("Writing new loom file to", filename)
   }
   # Make the loom file
   new.loom <- create(
@@ -1103,7 +1120,7 @@ subset.loom <- function(
   row.attrs <- list.datasets(object = x, path = 'row_attrs', full.names = TRUE)
   if (length(x = row.attrs) > 0) {
     if (display.progress) {
-      cat("\nAdding", length(x = row.attrs), "row attributes\n")
+      catn("\nAdding", length(x = row.attrs), "row attributes")
       pb <- new.pb()
       counter <- 0
     }
@@ -1123,7 +1140,7 @@ subset.loom <- function(
   col.attrs <- list.datasets(object = x, path = 'col_attrs', full.names = TRUE)
   if (length(x = col.attrs) > 0) {
     if (display.progress) {
-      cat("\nAdding", length(x = col.attrs), "column attributes\n")
+      catn("\nAdding", length(x = col.attrs), "column attributes")
       pb <- new.pb()
       counter <- 0
     }
@@ -1143,7 +1160,7 @@ subset.loom <- function(
   layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
   if (length(x = layers) > 0) {
     if (display.progress) {
-      cat("\nAdding", length(x = layers), "layers\n")
+      catn("\nAdding", length(x = layers), "layers")
       pb <- new.pb()
       counter <- 0
     }
