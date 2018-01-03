@@ -751,7 +751,7 @@ loom <- R6Class(
       }
       layers.names <- names(x = self[['layers']])
       for (i in layers.names) {
-        self[['layers', i]][dims.fill, ] <- t(x = layers.data[[i]])
+        self[['layers']][[i]][dims.fill, ] <- t(x = layers.data[[i]])
         if (display.progress) {
           counter <- counter + 1
           setTxtProgressBar(pb = pb, value = counter / length(x = layers.names))
@@ -765,7 +765,7 @@ loom <- R6Class(
       }
       attrs.names <- names(x = self[['col_attrs']])
       for (i in attrs.names) {
-        self[['col_attrs', i]][dims.fill] <- attributes.data[[i]]
+        self[['col_attrs']][[i]][dims.fill] <- attributes.data[[i]]
         if (display.progress) {
           counter <- counter + 1
           setTxtProgressBar(pb = pb, value = counter / length(x = attrs.names))
@@ -777,7 +777,50 @@ loom <- R6Class(
       # private$load_attributes(MARGIN = 2)
       # self$shape <- self[['matrix']]$dims
     }
-    # add.loom = function() {}
+    add.loom = function(
+      other,
+      gene.names = NULL,
+      self.gene.names = NULL,
+      ...
+    ) {
+      # Connect to the other loom file
+      if (inherits(x = other, what = 'loom')) {
+        ofile <- other
+      } else if (is.character(x = other)) {
+        ofile <- connect(filename = other)
+      } else {
+        stop("'other' must be either a loom object or a path to a loom file")
+      }
+      # Key matching
+      if (!is.null(x = gene.names) && !is.null(x = self.gene.names)) {
+        gene.names <- basename(path = gene.names)
+        self.gene.names <- basename(path = self.gene.names)
+        name.check <- c(
+          gene.names %in% names(x = other[['row_attrs']]),
+          self.gene.names %in% names(x = other[['row_attrs']])
+        )
+        name.check <- !name.check
+        if (any(name.check)) {
+          if (is.character(x = other)) {
+            ofile$close_all()
+          }
+          failed.check <- which(x = name.check)[1]
+          stop(paste0(
+            "Failed to find the '",
+            paste0('row_attrs/', c(gene.names, self.gene.names)[failed.check]),
+            "' dataset in ",
+            switch(EXPR = failed.check, '1' = 'the other', '2' = 'this'),
+            " loom file"
+          ))
+        }
+        gene.names <- other[['row_attrs']][[gene.names]][]
+        self.gene.names <- self[['row_attrs']][[self.gene.names]][]
+      }
+      # Clean up
+      if (is.character(x = other)) {
+        ofile$close_all()
+      }
+    }
   ),
   # Private fields and methods
   # @field err_msg A simple error message if this object hasn't been created with loomR::create or loomR::connect
