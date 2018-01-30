@@ -973,7 +973,7 @@ create <- function(
   }
   if (length(x = chunk.dims) > 2 || length(x = chunk.dims) < 1) {
     stop("'chunk.dims' must be a one- or two-length integer vector or 'auto'")
-  } else if (length(x = chunk.dims == 1)) {
+  } else if (length(x = chunk.dims) == 1) {
     if (!grepl(pattern = '^auto$', x = chunk.dims, perl = TRUE)) {
       chunk.dims <- rep.int(x = as.integer(x = chunk.dims), times = 2)
     }
