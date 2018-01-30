@@ -647,24 +647,8 @@ loom <- R6Class(
           stop("'expected' must be one of 'matrix', 'vector', or NULL")
         )
       }
-      # Determine the shape of our results
-      index.use <- private$iter_range(index.use = index.use)
       # Create our results holding object
-      if (results.matrix) {
-        switch(
-          EXPR = private$iter.margin,
-          '1' = results <- matrix( # Genes, make matrix with nCells rows and range(index.use) columns
-            nrow = self$shape[1],
-            ncol = length(x = index.use[1]:index.use[2])
-          ),
-          '2' = results <- matrix( # Cells, make matrix with range(index.use) rows and nGenes columns
-            nrow = length(x = index.use[1]:index.use[2]),
-            ncol = self$shape[2]
-          )
-        )
-      } else {
-        results <- vector(length = length(x = index.use[1]:index.use[2]))
-      }
+      results <- vector(mode = "list", length = length(x = batch))
       if (display.progress) {
         pb <- txtProgressBar(char = '=', style = 3)
       }
@@ -679,20 +663,22 @@ loom <- R6Class(
         } else {
           self[[dataset.use]][chunk.indices]
         }
-        chunk.data <- FUN(chunk.data, ...)
-        if (results.matrix) {
-          if (MARGIN == 1) {
-            results[, chunk.indices] <- chunk.data
-          } else if (MARGIN == 2) {
-            results[chunk.indices, ] <- chunk.data
-          }
-        } else {
-          results[chunk.indices] <- chunk.data
-        }
+        results[[i]] <- FUN(chunk.data, ...)
         if (display.progress) {
           setTxtProgressBar(pb = pb, value = i / length(x = batch))
         }
       }
+      # Bring result list into vector or matrix format
+      if (class(results[[1]]) == 'numeric') {
+        results <- unlist(x = results, use.names = FALSE)
+      } else {
+        if (MARGIN == 1) {
+          results <- Reduce(f = cbind, x = results)
+        } else if (MARGIN == 2) {
+          results <- Reduce(f = rbind, x = results)
+        }
+      }
+
       private$reset_batch()
       return(results)
     },
