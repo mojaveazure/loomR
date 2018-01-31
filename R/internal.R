@@ -21,7 +21,7 @@ validateLoom <- function(object) {
   }
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
   required.groups <- c('row_attrs', 'col_attrs', 'layers')
-  dim.matrix <- object[[root.datasets]]$dims # Columns x Rows
+  dim.matrix <- object[['matrix']]$dims # Columns x Rows
   names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
@@ -35,22 +35,25 @@ validateLoom <- function(object) {
   if (!all(required.groups %in% root.groups)) {
     stop(group.msg)
   }
-  unlist(x = sapply(
-    X = required.groups[1:2],
-    FUN = function(group) {
-      if (length(x = list.groups(object = object[[group]], recursive = FALSE)) > 0) {
-        stop(paste("Group", group, "cannot have subgroups"))
-      }
-      if (length(x = list.attributes(object = object[[group]])) > 0) {
-        stop(paste("Group", group, "cannot have subattributes"))
-      }
-      for (dataset in list.datasets(object = object[[group]])) {
-        if (object[[paste(group, dataset, sep = '/')]]$dims != dim.matrix[group]) {
-          stop(paste("All datasets in group", group, "must be of length", required.groups[group]))
-        }
+  # Check row and column attributes
+  for (group in required.groups[1:2]) {
+    # No subgroups
+    if (length(x = list.groups(object = object[[group]], recursive = FALSE)) > 0) {
+      stop(paste("Group", group, "cannot have subgroups"))
+    }
+    # All datasets must have their first (last) dimmension equal to M(row) or N(column)
+    for (dataset in list.datasets(object = object[[group]])) {
+      dataset.dim <- object[[group]][[dataset]]$dims
+      dataset.dim <- dataset.dim[length(x = dataset.dim)]
+      if (dataset.dim != dim.matrix[group]) {
+        print(dataset)
+        print(object[[group]][[dataset]])
+        print(dim.matrix)
+        stop("All datasets in group ", group, " must be of length ", dim.matrix[group])
       }
     }
-  ))
+  }
+  # Check layers
   for (dataset in list.datasets(object = object[['/layers']])) {
     if (any(object[[paste('layers', dataset, sep = '/')]]$dims != dim.matrix)) {
       stop(paste("All datasets in '/layers' must be", dim.matrix[1], 'by', dim.matrix[2]))

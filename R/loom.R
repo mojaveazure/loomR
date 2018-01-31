@@ -26,18 +26,14 @@ NULL
 #'   \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
 #'   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
 #'     Add extra information to this loom file where
-#'     \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix},
-#'     \code{MARGIN} is either 1 for genes or 2 for cells, and
-#'     \code{overwrite} tells us whether we can overwrite existing attributes or not
+#'     \describe{
+#'       \item{\code{attribute}}{A named list where the first dimmension of each element as long as one dimension of \code{/matrix}}
+#'       \item{\code{MARGIN}}{Either 1 for genes or 2 for cells}
+#'       \item{\code{overwrite}}{Can overwrite existing attributes?}
+#'     }
 #'   }
 #'   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
 #'   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
-#'   \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
-#'   \item{\code{get.attribute.df(attribute.layer, attribute.names, row.names, col.names)}}{
-#'     Extract a data.frame of \code{attribute.names} from an \code{attribute.layer} ("row" - row_attrs or "col" - col_attrs).
-#'     Returns a data.frame into memory with \code{attribute.names} as the columns.
-#'     Removes rows that are entirely composed of NA values.
-#'   }
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
@@ -123,7 +119,17 @@ loom <- R6Class(
         }
         self$shape <- rev(self[['matrix']]$dims)
         # Store the chunk size
-        chunks <- h5attr(x = self, which = 'chunks')
+        chunks <- tryCatch(
+          expr = h5attr(x = self, which = 'chunks'),
+          error = function(e) {
+            hchunks <- self[['matrix']]$chunk_dims
+            pchunks <- paste0('(', paste(hchunks, collapse = ', '), ')')
+            if (mode != 'r') {
+              h5attr(x = self, which = 'chunks') <- pchunks
+            }
+            return(pchunks)
+          }
+        )
         chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
         chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
         chunks <- unlist(x = strsplit(x = chunks, split = ','))
@@ -225,53 +231,66 @@ loom <- R6Class(
         stop(private$err_mode)
       }
       # Value checking
-      if (is.data.frame(x = attribute)) {
-        attribute <- as.list(x = attribute)
+      is.actual.list <- is.list(x = attribute) && !is.data.frame(x = attribute)
+      if (!is.actual.list || is.null(x = names(x = attribute))) {
+        stop("Attributes must be provided as a named list (dataframes excluded)")
       }
-      if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
-        stop("'attribute' must be a named list")
+      # if (is.data.frame(x = attribute)) {
+      #   attribute <- as.list(x = attribute)
+      # }
+      # if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
+      #   stop("'attribute' must be a named list")
+      # }
+      if (!MARGIN %in% c(1, 2)) {
+        stop("'MARGIN' must be 1 or 2")
       }
+      length.use <- rev(x = self[['matrix']]$dims)[MARGIN]
+      dim.msg <- paste(
+        "At least one dimmension for each",
+        switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
+        "attribute must be",
+        length.use
+      )
       for (i in 1:length(x = attribute)) {
-        if (!is.vector(x = attribute[[i]]) && !is.factor(x = attribute[[i]])) {
-          if (length(x = dim(x = attribute[[i]])) > 1) {
-            print(length(x = attribute[[i]]))
-            stop("All attributes must be one-dimensional vectors")
-          } else {
-            attribute[[i]] <- as.vector(x = attribute[[i]])
+        if (is.matrix(x = attribute[[i]]) || is.data.frame(x = attribute[[i]])) {
+          margin.use <- which(x = dim(x = attribute[[i]]) == length.use)
+          if (!length(x = margin.use)) {
+            stop(dim.msg)
           }
+          margin.use <- margin.use[1]
+          attribute[[i]] <- switch(
+            EXPR = margin.use,
+            '1' = t(x = as.matrix(x = attribute[[i]])),
+            '2' = as.matrix(x = attribute[[i]]),
+            stop("All attributes must be one- or two-dimmensional")
+          )
+        } else {
+          if (length(x = attribute[[i]]) != length.use) {
+            stop(dim.msg)
+          }
+          attribute[[i]] <- as.vector(x = attribute[[i]])
         }
       }
       if (length(x = which(x = names(x = attribute) != '')) != length(x = attribute)) {
         stop("Not all attributes had names provided")
       }
-      if (!MARGIN %in% c(1, 2)) {
-        stop("'MARGIN' must be 1 or 2")
-      }
-      # Add the attributes as datasets for our MARGIN's group
-      if (is.null(x = self$shape)) {
-        stop(private$err_init)
-      }
       grp.name <- c('row_attrs', 'col_attrs')[MARGIN]
       grp <- self[[grp.name]]
-      for (i in 1:length(x = attribute)) {
-        if (length(attribute[[i]]) != self$shape[MARGIN])
-          stop(paste(
-            "All",
-            switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
-            "attributes must be of length",
-            self$shape[MARGIN]
+      if (!overwrite) {
+        names.fail <- which(x = names(x = attribute) %in% names(x = grp))
+        if (length(x = names.fail) != 0) {
+          stop(paste0(
+            "The following names are already used for ",
+            switch(EXPR = MARGIN, '1' = 'row', '2' = 'column'),
+            " attributes: '",
+            paste(names(x = attribute)[names.fail], collapse = ''),
+            "'"
           ))
-        if (names(x = attribute)[i] %in% list.datasets(object = grp)) {
-          if (overwrite) {
-            grp$link_delete(name = names(x = attribute)[i])
-          } else {
-            stop(paste(
-              "An attribute with the name",
-              names(x = attribute)[i],
-              "already exists!"
-            ))
-          }
         }
+      }
+      # Add the attributes as datasets for our MARGIN's group
+      for (i in 1:length(x = attribute)) {
+        try(expr = grp$link_delete(name = names(x = attribute)[i]), silent = TRUE)
         grp[[names(x = attribute)[i]]] <- attribute[[i]]
       }
       self$flush()
