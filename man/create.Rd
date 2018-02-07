@@ -5,7 +5,8 @@
 \title{Create a loom object}
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
-  layers = NULL, chunk.dims = "auto", overwrite = FALSE)
+  layers = NULL, chunk.dims = "auto", chunk.size = 10,
+  overwrite = FALSE, display.progress = TRUE)
 }
 \arguments{
 \item{filename}{The name of the new loom file}

@@ -969,7 +969,7 @@ create <- function(
   chunk.dims = 'auto',
   chunk.size = 10,
   overwrite = FALSE,
-  display.progress = TRUE,
+  display.progress = TRUE
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
   if (file.exists(filename) && !overwrite) {

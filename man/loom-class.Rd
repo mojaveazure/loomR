@@ -39,18 +39,14 @@ A class for loom files
   \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
     Add extra information to this loom file where
-    \code{attribute} is a named list where each element is a vector that is as long as one dimension of \code{/matrix},
-    \code{MARGIN} is either 1 for genes or 2 for cells, and
-    \code{overwrite} tells us whether we can overwrite existing attributes or not
+    \describe{
+      \item{\code{attribute}}{A named list where the first dimmension of each element as long as one dimension of \code{/matrix}}
+      \item{\code{MARGIN}}{Either 1 for genes or 2 for cells}
+      \item{\code{overwrite}}{Can overwrite existing attributes?}
+    }
   }
   \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
   \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
-  \item{\code{add.meta.data(meta.data)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
-  \item{\code{get.attribute.df(attribute.layer, attribute.names, row.names, col.names)}}{
-    Extract a data.frame of \code{attribute.names} from an \code{attribute.layer} ("row" - row_attrs or "col" - col_attrs).
-    Returns a data.frame into memory with \code{attribute.names} as the columns.
-    Removes rows that are entirely composed of NA values.
-  }
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
