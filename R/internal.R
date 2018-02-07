@@ -1,3 +1,16 @@
+chunkPoints <- function(data.size, chunk.size) {
+  return(vapply(
+    X = 1L:ceiling(data.size / chunk.size),
+    FUN = function(i) {
+      return(c(
+        start = (chunk.size * (i - 1L)) + 1L,
+        end = min(chunk.size * i, data.size)
+      ))
+    },
+    FUN.VALUE = numeric(length = 2L)
+  ))
+}
+
 # Validate a loom object
 #
 # @param object A loom object

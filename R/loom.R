@@ -954,7 +954,7 @@ loom <- R6Class(
 #'
 #' @return A connection to a loom file
 #'
-#' @importFrom utils packageVersion
+#' @importFrom utils packageVersion txtProgressBar setTxtProgressBar
 #'
 #' @seealso \code{\link{loom-class}}
 #'
@@ -967,7 +967,9 @@ create <- function(
   cell.attrs = NULL,
   layers = NULL,
   chunk.dims = 'auto',
-  overwrite = FALSE
+  chunk.size = 10,
+  overwrite = FALSE,
+  display.progress = TRUE,
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
   if (file.exists(filename) && !overwrite) {
@@ -987,11 +989,38 @@ create <- function(
   }
   new.loom <- loom$new(filename = filename, mode = mode)
   # Create the matrix
+  # new.loom$create_dataset(
+  #   name = 'matrix',
+  #   robj = data,
+  #   chunk_dims = chunk.dims
+  # )
+  dtype <- switch(
+    EXPR = class(x = data[1]),
+    'numeric' = h5types$double,
+    'integer' = h5types$int,
+    'character' = H5T_STRING$new(size = Inf),
+    'logical' = h5types$hbool_t
+  )
   new.loom$create_dataset(
     name = 'matrix',
-    robj = data,
-    chunk_dims = chunk.dims
+    dtype = dtype,
+    dims = dim(x = data)
   )
+  chunk.points <- chunkPoints(
+    data.size = dim(x = data)[1],
+    chunk.size = chunk.size
+  )
+  if (display.progress) {
+    pb <- txtProgressBar(char = '=', style = 3)
+  }
+  for (col in 1:ncol(x = chunk.points)) {
+    row.start <- chunk.points[1, col]
+    row.end <- chunk.points[2, col]
+    new.loom[['matrix']][row.start:row.end, ] <- as.matrix(x = data[row.start:row.end, ])
+    if (display.progress) {
+      setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
+    }
+  }
   new.loom$matrix <- new.loom[['matrix']]
   new.loom$shape <- rev(x = new.loom[['matrix']]$dims)
   # Groups
