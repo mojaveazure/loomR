@@ -57,7 +57,7 @@ NULL
 #'     \describe{
 #'       \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
 #'       \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
-#'       \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \cpde{self[['layers]]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+#'       \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
 #'       \item{\code{display.progress}}{display progress}
 #'     }
 #'   }
@@ -975,7 +975,7 @@ create <- function(
   if (file.exists(filename) && !overwrite) {
     stop(paste('File', filename, 'already exists!'))
   }
-  if (!is.matrix(x = data)) {
+  if (!inherits(x = data, what = c('matrix', 'Matrix'))) {
     data <- as.matrix(x = data)
   }
   if (length(x = chunk.dims) > 2 || length(x = chunk.dims) < 1) {
@@ -995,7 +995,7 @@ create <- function(
   #   chunk_dims = chunk.dims
   # )
   dtype <- switch(
-    EXPR = class(x = data[1]),
+    EXPR = class(x = data[1, 1]),
     'numeric' = h5types$double,
     'integer' = h5types$int,
     'character' = H5T_STRING$new(size = Inf),

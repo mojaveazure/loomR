@@ -70,7 +70,7 @@ A class for loom files
     \describe{
       \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
       \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
-      \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \cpde{self[['layers]]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+      \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
       \item{\code{display.progress}}{display progress}
     }
   }
