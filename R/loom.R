@@ -274,9 +274,12 @@ loom <- R6Class(
         stop(private$err_mode)
       }
       # Value checking
-      is.actual.list <- is.list(x = attribute) && !is.data.frame(x = attribute)
+      if (is.data.frame(x = attribute)) {
+        attribute <- as.list(x = attribute)
+      }
+      is.actual.list <- is.list(x = attribute)
       if (!is.actual.list || is.null(x = names(x = attribute))) {
-        stop("Attributes must be provided as a named list (dataframes excluded)")
+        stop("Attributes must be provided as a named list")
       }
       # if (is.data.frame(x = attribute)) {
       #   attribute <- as.list(x = attribute)
