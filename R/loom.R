@@ -23,7 +23,7 @@ NULL
 #'
 #' @section Methods:
 #' \describe{
-#'   \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
+#'   \item{\code{add.layer(layer, chunk.size, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
 #'   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
 #'     Add extra information to this loom file where
 #'     \describe{
@@ -170,7 +170,7 @@ loom <- R6Class(
       private$load_attributes(MARGIN = 2)
     },
     # Addding attributes and layers
-    add.layer = function(layers, overwrite = FALSE) {
+    add.layer = function(layers, chunk.size = 1000, overwrite = FALSE) {
       if (self$mode == 'r') {
         stop(private$err_mode)
       }
@@ -183,7 +183,8 @@ loom <- R6Class(
       }
       # Add layers
       for (i in 1:length(x = layers)) {
-        if (!is.matrix(x = layers[[i]])) {
+        # if (!is.matrix(x = layers[[i]])) {
+        if (!inherits(x = layers[[i]], what = c('Matrix', 'matrix'))) {
           layers[[i]] <- as.matrix(x = layers[[i]])
         }
         do.transpose <- FALSE
@@ -204,22 +205,46 @@ loom <- R6Class(
         if (do.transpose) {
           layers[[i]] <- t(x = layers[[i]])
         }
-        if (names(x = layers)[i] %in% list.datasets(object = self[['layers']])) {
+        layer.name <- names(x = layers)[i]
+        if (layer.name %in% list.datasets(object = self[['layers']])) {
           if (overwrite) {
-            self[['layers']]$link_delete(name = names(x = layers)[i])
+            self[['layers']]$link_delete(name = layer.name)
           } else {
             stop(paste(
               "A layer with the name",
-              names(x = layers)[i],
+              layer.name,
               "already!"
             ))
           }
         }
+        dtype <- getDtype(x = layers[[i]][1, 1])
         self[['layers']]$create_dataset(
-          name = names(x = layers)[i],
-          robj = layers[[i]],
-          chunk_dims = self$chunksize
+          name = layer.name,
+          dtype = dtype,
+          dims = dim(x = layers[[i]])
         )
+        chunk.points <- chunkPoints(
+          data.size = dim(x = layers[[i]])[1],
+          chunk.size = chunk.size
+        )
+        # if (display.progress) {
+        #   pb <- txtProgressBar(char = '=', style = 3)
+        # }
+        for (col in 1:ncol(x = chunk.points)) {
+          row.start <- chunk.points[1, col]
+          row.end <- chunk.points[2, col]
+          self[['layers']][[layer.name]][row.start:row.end, ] <- as.matrix(
+            x = layers[[i]][row.start:row.end, ]
+          )
+          # if (display.progress) {
+          #   setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
+          # }
+        }
+        # self[['layers']]$create_dataset(
+        #   name = names(x = layers)[i],
+        #   robj = layers[[i]],
+        #   chunk_dims = self$chunksize
+        # )
       }
       self$flush()
       gc(verbose = FALSE)
@@ -950,6 +975,7 @@ loom <- R6Class(
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
+#' @param chunk.size How many rows of \code{data} should we stream to the loom file at any given time?
 #' @param overwrite Overwrite an already existing loom file?
 #'
 #' @return A connection to a loom file
@@ -967,7 +993,7 @@ create <- function(
   cell.attrs = NULL,
   layers = NULL,
   chunk.dims = 'auto',
-  chunk.size = 10,
+  chunk.size = 1000,
   overwrite = FALSE,
   display.progress = TRUE
 ) {
@@ -994,13 +1020,7 @@ create <- function(
   #   robj = data,
   #   chunk_dims = chunk.dims
   # )
-  dtype <- switch(
-    EXPR = class(x = data[1, 1]),
-    'numeric' = h5types$double,
-    'integer' = h5types$int,
-    'character' = H5T_STRING$new(size = Inf),
-    'logical' = h5types$hbool_t
-  )
+  dtype <- getDtype(x = data[1, 1])
   new.loom$create_dataset(
     name = 'matrix',
     dtype = dtype,

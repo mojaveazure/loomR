@@ -1,3 +1,10 @@
+# Generate chunk points
+#
+# @param data.size How big is the data being chunked
+# @param chunk.size How big should each chunk be
+#
+# @return A matrix where each column is a chunk, row 1 is start points, row 2 is end points
+#
 chunkPoints <- function(data.size, chunk.size) {
   return(vapply(
     X = 1L:ceiling(data.size / chunk.size),
@@ -8,6 +15,27 @@ chunkPoints <- function(data.size, chunk.size) {
       ))
     },
     FUN.VALUE = numeric(length = 2L)
+  ))
+}
+
+# Get HDF5 data types
+#
+# @param An R object
+#
+# @return The corresponding HDF5 data type
+#
+#' @import hdf5r
+#
+# @seealso \code\link{hdf5r::h5types}
+#
+getDtype <- function(x) {
+  return(switch(
+    EXPR = class(x = x),
+    'numeric' = h5types$double,
+    'integer' = h5types$int,
+    'character' = H5T_STRING$new(size = Inf),
+    'logical' = h5types$hbool_t,
+    stop(paste("Unknown data type:", class(x = x)))
   ))
 }
 
@@ -324,7 +352,9 @@ addCells.col_attrs <- function(x, m2) {
 #
 #' @importFrom utils txtProgressBar
 #
-new.pb <- function() {return(txtProgressBar(style = 3, char = '='))}
+new.pb <- function() {
+  return(txtProgressBar(style = 3, char = '='))
+}
 
 # Cat with a new line
 #
