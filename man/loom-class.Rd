@@ -36,7 +36,7 @@ A class for loom files
 \section{Methods}{
 
 \describe{
-  \item{\code{add.layer(layer, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
+  \item{\code{add.layer(layer, chunk.size, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
     Add extra information to this loom file where
     \describe{
