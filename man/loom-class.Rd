@@ -36,17 +36,25 @@ A class for loom files
 \section{Methods}{
 
 \describe{
-  \item{\code{add.layer(layer, chunk.size, overwrite)}}{Add a data layer to this loom file, must be the same dimensions as \code{/matrix}}
+  \item{\code{add.layer(layer, chunk.size, overwrite)}}{
+    Add a data layer to this loom file, must be the same dimensions as \code{/matrix}
+    \describe{
+      \item{\code{layer}}{A named list of matrices to be added as layers}
+      \item{\code{chunk.size}}{Number of rows from each layer to stream at once, defaults to 1000}
+      \item{\code{overwrite}}{If a layer already exists, overwrite with new data, defaults to FALSE}
+    }
+  }
   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
-    Add extra information to this loom file where
+    Add extra information to this loom file.
     \describe{
       \item{\code{attribute}}{A named list where the first dimmension of each element as long as one dimension of \code{/matrix}}
       \item{\code{MARGIN}}{Either 1 for genes or 2 for cells}
       \item{\code{overwrite}}{Can overwrite existing attributes?}
     }
   }
-  \item{\code{add.row.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 1)}}
-  \item{\code{add.col.attribute(attribute)}}{A wrapper for \code{add.attribute(attribute, MARGIN = 2)}}
+  \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
+    Add row or column attributes
+  }
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
@@ -60,6 +68,16 @@ A class for loom files
     Apply a function over a dataset within the loom file, stores the results in the loom file.
     \code{name} must be the full name of the dataset ('group/name').
     \code{apply} will always use the entire dataset specified in \code{dataset.use}
+    \describe{
+      \item{\code{name}}{Name of dataset to store results to}
+      \item{\code{FUN}}{Function to apply}
+      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2)}
+      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by}
+      \item{\code{dataset.use}}{Name of dataset to use}
+      \item{\code{overwrite}}{Overite \code{name} if already exists}
+      \item{\code{display.progress}}{Display progress}
+      \item{\code{...}}{Extra parameters to pass to \code{FUN}}
+    }
   }
   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
     Map a function onto a dataset within the loom file, returns the result into R.
