@@ -61,16 +61,16 @@ validateLoom <- function(object) {
     stop("The root dataset must be called '/matrix'")
   }
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
-  required.groups <- c('row_attrs', 'col_attrs', 'layers')
+  required.groups <- c('row_attrs', 'col_attrs', 'layers', 'row_edges', 'col_edges')
   dim.matrix <- object[['matrix']]$dims # Columns x Rows
   names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
   group.msg <- paste0(
-    "There can only be three groups in the loom file: '",
+    paste("There can only be", length(x = required.groups), "groups in the loom file: '"),
     paste(required.groups, collapse = "', '"),
     "'"
   )
-  if (length(x = root.groups) != 3) {
+  if (length(x = root.groups) != length(x = required.groups)) {
     stop(group.msg)
   }
   if (!all(required.groups %in% root.groups)) {
