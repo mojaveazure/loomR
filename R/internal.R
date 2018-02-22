@@ -70,8 +70,27 @@ validateLoom <- function(object) {
     paste(required.groups, collapse = "', '"),
     "'"
   )
-  if (length(x = root.groups) != length(x = required.groups)) {
+  reopen.msg <- paste(
+    group.msg,
+    "Reopen in 'r+' mode to automatically add missing groups",
+    sep = '\n'
+  )
+  if (length(x = root.groups) > length(x = required.groups)) {
     stop(group.msg)
+  } else if (length(x = root.groups) < length(x = required.groups)) {
+    if (all(root.groups %in% required.groups)) {
+      if (object$mode != 'r') {
+        missing.groups <- required.groups[!(required.groups %in% root.groups)]
+        for (group in missing.groups) {
+          object$create_group(name = group)
+        }
+        root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
+      } else {
+        stop(reopen.msg)
+      }
+    } else {
+      stop(group.msg)
+    }
   }
   if (!all(required.groups %in% root.groups)) {
     stop(group.msg)
