@@ -86,6 +86,7 @@ validateLoom <- function(object) {
         }
         root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
       } else {
+        object$close_all()
         stop(reopen.msg)
       }
     } else {
