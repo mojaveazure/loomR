@@ -660,6 +660,9 @@ loom <- R6Class(
           setTxtProgressBar(pb = pb, value = i / length(x = batch))
         }
       }
+      if (display.progress) {
+        close(con = pb)
+      }
       # Clean up and allow chaining
       private$reset_batch()
       # Load layers and attributes
@@ -743,7 +746,9 @@ loom <- R6Class(
           results <- Reduce(f = rbind, x = results)
         }
       }
-
+      if (display.progress) {
+        close(con = pb)
+      }
       private$reset_batch()
       return(results)
     },
