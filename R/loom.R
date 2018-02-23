@@ -1110,7 +1110,8 @@ create <- function(
 #' Connect to a loom file
 #'
 #' @param filename The loom file to connect to
-#' @param mode How do we connect to it? Pass 'r' for read-only or 'r+' for read/write
+#' @param mode How do we connect to it? Pass 'r' for read-only or 'r+' for read/write.
+#' If \code{mode} is 'r+', loomR will automatically add missing required groups during validation
 #' @param skip.validate Skip the validation steps, use only for extremely large loom files
 #'
 #' @return A loom file connection
