@@ -1131,6 +1131,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @param filename Filename for new loom object, defaults to ...
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress as we're copying over data
+#' @param ... Ignored for now
 #'
 #' @return A loom object connected to \code{filename}
 #'
@@ -1254,6 +1255,200 @@ subset.loom <- function(
   }
   new.loom$flush()
   return(new.loom)
+}
+
+#' Combine loom files
+#'
+#' @param x A vector of loom files or filenames
+#' @param filename Name for resultant vector
+#' @param chunk.size How many rows form each input loom should we stream to the merged loom file at any given time?
+#' @param order.by Optional row attribute to order each input loom by, must be one dimensional
+#' @param overwrite Overwrite \code{filename} if already exists?
+#' @param display.progress Display progress as we're copying over data
+#'
+#' @return A loom object connected to \code{filename}
+#'
+#' @importFrom utils setTxtProgressBar
+#'
+#' @export Combine
+#'
+combine <- function(
+  looms,
+  filename,
+  chunk.size = 1000,
+  order.by = NULL,
+  overwrite = FALSE,
+  display.progress = TRUE,
+  ...
+) {
+  # Basic checking of input arguments
+  looms <- looms[vapply(
+    X = looms,
+    FUN = inherits,
+    FUN.VALUE = logical(length = 1L),
+    what = c('loom', 'character')
+  )]
+  if (length(x = looms) < 2) {
+    stop("Need at least two loom objects or files to merge")
+  }
+  # Check the existance of loom files
+  loom.names <- looms[is.character(x = looms)]
+  if (length(x = loom.names) > 0) {
+    if (!all(file.exists(loom.names))) {
+      stop(paste0(
+        "Cannot find the following loom files: '",
+        paste(loom.names[!file.exists(loom.names)], collapse = "', '"),
+        "'"
+      ))
+    }
+  }
+  # Set mode and provide more useful error
+  mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
+  if (file.exists(filename) && !overwrite) {
+    stop(paste('File', filename, 'already exists!'))
+  }
+  # Check loom contents
+  # Every loom must have same number of genes (rows, MARGIN = 2)
+  # and same datasets in the groups
+  row.attrs <- vector(mode = 'list', length = length(x = looms))
+  row.types <- list()
+  col.attrs <- vector(mode = 'list', length = length(x = looms))
+  col.types <- list()
+  layers <- vector(mode = 'list', length = length(x = looms))
+  layers.types <- list()
+  nrows <- vector(mode = 'list', length = length(x = looms))
+  ncols <- vector(mode = 'list', length = length(x = looms))
+  for (i in 1:length(x = looms)) {
+    this <- if (is.character(x = looms[i])) {
+      connect(filename = looms[i])
+    } else {
+      looms[i]
+    }
+    row.attrs[[i]] <- sort(x = list.datasets(
+      object = this,
+      path = 'row_attrs',
+      full.names = TRUE
+    ))
+    for (attr in row.attrs[[i]]) {
+      if (length(x = attr) > 0) {
+        row.types[[attr]] <- c(
+          row.types[[attr]],
+          as.character(x = this[[attr]]$get_type()$get_class())
+        )
+      }
+    }
+    col.attrs[[i]] <- sort(x = list.datasets(
+      object = this,
+      path = 'col_attrs',
+      full.names = TRUE
+    ))
+    for (attr in col.attrs[[i]]) {
+      if (length(x = attr) > 0) {
+        col.types[[attr]] <- c(
+          col.types[[attr]],
+          as.character(x = this[[attr]]$get_type()$get_class())
+        )
+      }
+    }
+    layers[[i]] <- sort(x = list.datasets(
+      object = this,
+      path = 'layers',
+      full.names = TRUE
+    ))
+    for (lay in layers) {
+      if (length(x = lay) > 0) {
+        layers.types[[lay]] <- c(
+          layers.types[[attr]],
+          as.character(x = this[[lay]]$get_type()$get_class())
+        )
+      }
+    }
+    nrows[[i]] <- this[['matrix']]$dims[2]
+    ncols[[i]] <- this[['matrix']]$dims[1]
+    if (is.character(x = looms[i])) {
+      this$close_all()
+    }
+  }
+  row.attrs <- unique(x = row.attrs)
+  col.attrs <- unique(x = col.attrs)
+  layers <- unique(x = layers)
+  nrows <- unique(x = nrows)
+  ncells <- sum(unlist(x = ncols))
+  if (length(x = row.attrs) != 1) {
+    stop("Not all loom objects have the same row attributes")
+  }
+  if (length(x = col.attrs) != 1) {
+    stop("Not all loom objects have the same column attributes")
+  }
+  if (length(x = layers) != 1) {
+    stop("Not all loom objects have the same layers")
+  }
+  if (length(x = nrows) != 1) {
+    stop("Not all loom objects have the number of rows (MARGIN = 2)")
+  }
+  # Check for the row attribute to order by
+  if (!is.null(x = order.by)) {
+    if (!grepl(pattern = order.by, x = row.attrs)) {
+      stop(paste0("Cannot find '", order.by, "' in the row attributes for the loom files provided"))
+    } else {
+      temp <- if (is.character(x = looms[1])) {
+        connect(filename = looms[1])
+      } else {
+        looms[1]
+      }
+      order.dat <- temp[['row_attrs']][[basename(path = order.by)]]
+      if (length(x = order.dat$dims) != 1) {
+        if (is.character(x = looms[1])) {
+          temp$close_all()
+        }
+        stop("'order.by' must reference a one dimensional attribute")
+      }
+      order.use <- order.dat[]
+      if (is.character(x = looms[1])) {
+        temp$close_all()
+      }
+    }
+  }
+  # Check data types:
+  row.types <- lapply(X = row.types, FUN = unique)
+  row.types.counts <- vapply(X = row.types, FUN = length, FUN.VALUE = integer(length = 1L))
+  col.types <- lapply(X = col.types, FUN = unique)
+  col.types.counts <- vapply(X = col.types, FUN = length, FUN.VALUE = integer(length = 1L))
+  layers.types <- lapply(X = layers.types, FUN = unique)
+  layers.types.counts <- vapply(X = layers.types, FUN = length, FUN.VALUE = integer(length = 1L))
+  if (any(row.types.counts > 1)) {
+    stop(paste0(
+      "The following row attributes have multiple types across the input loom files: '",
+      paste(names(x = row.types.counts[row.types.counts > 1]), collapse = "', '"),
+      "'; cannot combine"
+    ))
+  }
+  if (any(col.types.counts > 1)) {
+    stop(paste0(
+      "The following column attributes have multiple types across the input loom files: '",
+      paste(names(x = col.types.counts[col.types.counts > 1]), collapse = "', '"),
+      "'; cannot combine"
+    ))
+  }
+  if (any(layers.types.counts > 1)) {
+    stop(paste0(
+      "The following layers have multiple types across the input loom files: '",
+      paste(names(x = layers.types.counts[layers.types.counts > 1]), collapse = "', '"),
+      "'; cannot combine"
+    ))
+  }
+  # # Create new HDF5 file
+  # hfile <- h5file(filename = filename, mode = mode)
+  # Start adding loom objects
+  for (i in 1:length(x = looms)) {
+    catn("Adding loom file", i ,"of", length(x = looms))
+    chunk.points <- chunkPoints(data.size = ncols[[i]], chunk.size = chunk.size)
+    next
+  }
+  # # Close and reopen as loom object for returning
+  # hfile$close_all()
+  # lfile <- connect(filename = filename, mode = 'r+')
+  # return(lfile)
 }
 
 # #need to comment
