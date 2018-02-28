@@ -1275,7 +1275,7 @@ subset.loom <- function(
 #'
 #' @importFrom utils setTxtProgressBar
 #'
-#' @export Combine
+#' @export
 #'
 combine <- function(
   looms,
@@ -1318,11 +1318,18 @@ combine <- function(
   row.attrs <- vector(mode = 'list', length = length(x = looms))
   row.types <- list()
   col.attrs <- vector(mode = 'list', length = length(x = looms))
+  col.dims <- list()
+  col.ndims <- list()
   col.types <- list()
   layers <- vector(mode = 'list', length = length(x = looms))
   layers.types <- list()
   nrows <- vector(mode = 'list', length = length(x = looms))
   ncols <- vector(mode = 'list', length = length(x = looms))
+  matrix.type <- list()
+  if (display.progress) {
+    catn("Validating", length(x = looms), "input loom files")
+    pb <- new.pb()
+  }
   for (i in 1:length(x = looms)) {
     this <- if (is.character(x = looms[i])) {
       connect(filename = looms[i])
@@ -1338,7 +1345,7 @@ combine <- function(
       if (length(x = attr) > 0) {
         row.types[[attr]] <- c(
           row.types[[attr]],
-          as.character(x = this[[attr]]$get_type()$get_class())
+          class(x = this[[attr]]$get_type())[1]
         )
       }
     }
@@ -1351,7 +1358,12 @@ combine <- function(
       if (length(x = attr) > 0) {
         col.types[[attr]] <- c(
           col.types[[attr]],
-          as.character(x = this[[attr]]$get_type()$get_class())
+          class(x = this[[attr]]$get_type())[1]
+        )
+        col.dims[[attr]] <- sum(col.dims[[attr]], this[[attr]]$dims[1])
+        col.ndims[[attr]] <- c(
+          col.ndims[[attr]],
+          length(x = this[[attr]]$dims)
         )
       }
     }
@@ -1363,22 +1375,27 @@ combine <- function(
     for (lay in layers) {
       if (length(x = lay) > 0) {
         layers.types[[lay]] <- c(
-          layers.types[[attr]],
-          as.character(x = this[[lay]]$get_type()$get_class())
+          layers.types[[lay]],
+          class(x = this[[lay]]$get_type())[1]
         )
       }
     }
     nrows[[i]] <- this[['matrix']]$dims[2]
     ncols[[i]] <- this[['matrix']]$dims[1]
+    matrix.type[[i]] <- class(x = this[['matrix']]$get_type())[1]
     if (is.character(x = looms[i])) {
       this$close_all()
+    }
+    if (display.progress) {
+      setTxtProgressBar(pb = pb, value = i / length(x = looms))
     }
   }
   row.attrs <- unique(x = row.attrs)
   col.attrs <- unique(x = col.attrs)
   layers <- unique(x = layers)
-  nrows <- unique(x = nrows)
-  ncells <- sum(unlist(x = ncols))
+  nrows <- unlist(x = unique(x = nrows))
+  ncols <- unlist(x = ncols)
+  ncells <- sum(ncols)
   if (length(x = row.attrs) != 1) {
     stop("Not all loom objects have the same row attributes")
   }
@@ -1392,29 +1409,34 @@ combine <- function(
     stop("Not all loom objects have the number of rows (MARGIN = 2)")
   }
   # Check for the row attribute to order by
-  if (!is.null(x = order.by)) {
-    if (!grepl(pattern = order.by, x = row.attrs)) {
+  if (!is.null(x = order.by)) { # We have something to order by
+    if (!grepl(pattern = order.by, x = row.attrs)) { # Check to ensure that the order.by is in each of our row attributes
       stop(paste0("Cannot find '", order.by, "' in the row attributes for the loom files provided"))
     } else {
-      temp <- if (is.character(x = looms[1])) {
+      # If it is, get the values to order by
+      order.by <- basename(path = order.by) # Basename of the order.by attribute name
+      temp <- if (is.character(x = looms[1])) { # Connect to the loom first loom file
         connect(filename = looms[1])
       } else {
         looms[1]
       }
-      order.dat <- temp[['row_attrs']][[basename(path = order.by)]]
+      order.dat <- temp[['row_attrs']][[order.by]] # Ensure that our order.by attribute is one dimmensional
       if (length(x = order.dat$dims) != 1) {
         if (is.character(x = looms[1])) {
           temp$close_all()
         }
         stop("'order.by' must reference a one dimensional attribute")
       }
+      # If so, pull the data
       order.use <- order.dat[]
+      # If the first loom was initially closed, close it again
       if (is.character(x = looms[1])) {
         temp$close_all()
       }
     }
   }
   # Check data types:
+  matrix.type <- unlist(x = unique(x = matrix.type))
   row.types <- lapply(X = row.types, FUN = unique)
   row.types.counts <- vapply(X = row.types, FUN = length, FUN.VALUE = integer(length = 1L))
   col.types <- lapply(X = col.types, FUN = unique)
@@ -1442,18 +1464,129 @@ combine <- function(
       "'; cannot combine"
     ))
   }
-  # # Create new HDF5 file
-  # hfile <- h5file(filename = filename, mode = mode)
-  # Start adding loom objects
-  for (i in 1:length(x = looms)) {
-    catn("Adding loom file", i ,"of", length(x = looms))
-    chunk.points <- chunkPoints(data.size = ncols[[i]], chunk.size = chunk.size)
-    next
+  if (length(x = matrix.type) != 1) {
+    stop("Cannot combine multiple datatypes for '/matrix'")
   }
-  # # Close and reopen as loom object for returning
-  # hfile$close_all()
-  # lfile <- connect(filename = filename, mode = 'r+')
-  # return(lfile)
+  # Check dimmensions for col_attrs
+  col.ndims <- lapply(X = col.ndims, FUN = unique)
+  col.ndims.counts <- vapply(X = col.ndims, FUN = length, FUN.VALUE = integer(length = 1L))
+  if (any(col.ndims.counts > 1)) {
+    stop(paste0(
+      "The following column attributes have varying dimmensions across the input loom files: '",
+      paste(names(x = col.ndims.counts[col.ndims.counts > 1]), collapse = "', '"),
+      "'; cannot combine"
+    ))
+  }
+  # Create the new HDF5 file and the required groups
+  new.loom <- loom$new(filename = filename, mode = mode)
+  new.loom$create_group(name = 'layers')
+  new.loom$create_group(name = "row_attrs")
+  new.loom$create_group(name = "col_attrs")
+  new.loom$create_group(name = "row_edges")
+  new.loom$create_group(name = "col_edges")
+  # Initialize the '/matrix' dataset as well as datasets in 'col_attrs' and 'layers'
+  new.loom$create_dataset(
+    name = 'matrix', # Name is '/matrix'
+    dtype = getDtype2(x = matrix.type), # Use the single type that we got from above
+    dims = c(ncells, nrows) # Use the number of cells from the sum of ncols above, nrows should be the same for everyone
+  )
+  for (attr in col.attrs) {
+    if (length(x = attr) > 0) {
+      dims.use <- switch(
+        EXPR = col.ndims[[attr]],
+        '1' = ncells,
+        '2' = c(col.dims[[attr]], ncells),
+        stop("loomR supports only one- and two-dimmensional attribute datasets")
+      )
+      new.loom$create_dataset(
+        name = attr,
+        dtype = getDtype2(x = col.types[[attr]]),
+        dims = dims.use
+      )
+    }
+  }
+  for (lay in layers) {
+    if (length(x = lay) > 1) {
+      new.loom$create_dataset(
+        name = lay,
+        dtype = getDtype2(x = layers.types[[lay]]),
+        dims = c(ncells, nrows)
+      )
+    }
+  }
+  # Start adding loom objects
+  col.previous <- vector(mode = 'integer', length = length(x = col.attrs))
+  names(x = col.previous) <- unlist(x = col.attrs)
+  lay.previous <- vector(mode = 'integer', length = length(x = layers))
+  names(x = lay.previous) <- unlist(x = layers)
+  for (i in 1:length(x = looms)) {
+    if (display.progress) {
+      catn("Adding loom file", i ,"of", length(x = looms))
+    }
+    # Open the loom file
+    this <- if (is.character(x = looms[i])) {
+      connect(filename = looms[i])
+    } else {
+      looms[i]
+    }
+    # Get the chunk points
+    chunk.points <- chunkPoints(data.size = ncols[[i]], chunk.size = chunk.size)
+    # print(chunk.points)
+    # Pull ordering information
+    order.genes <- if (is.null(x = order.by)) {
+      1:nrows # If order.by wasn't provided, just use 1:number of genes
+    } else {
+      # Otherwise, match the data order from our order.use
+      order(match(x = this[[row.attrs]][[order.by]][], table = order.use))
+    }
+    # Add data to /matrix, /col_attrs, and /layers
+    if (display.progress) {
+      catn("Adding data to /matrix and /layers")
+      pb <- new.pb()
+    }
+    for (col in 1:ncol(x = chunk.points)) {
+      cells.use <- chunk.points[1, col]:chunk.points[2, col]
+      # Add /matrix for this chunk
+      matrix.add <- this[['matrix']][cells.use, ]
+      new.loom[['matrix']][cells.use, ] <- matrix.add[, order.genes]
+      # Add layers for this chunk
+      for (lay in list.datasets(object = this[['layers']])) {
+        lay.add <- this[['layers']][[lay]][cells.use, ]
+        new.loom[['layers']][[lay]][cells.use, ] <- lay.add[, order.genes]
+      }
+      if (display.progress) {
+        setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
+      }
+      gc()
+    }
+    # Add col_attrs for this chunk
+    for (attr in list.datasets(object = this[['col_attrs']], full.names = TRUE)) {
+      start <- col.previous[attr]
+      end <- start + this[[attr]]$dims
+      if (col.ndims[[attr]] == 1) {
+        new.loom[[attr]][start:end] <- this[[attr]][]
+      } else {
+        for (col in 1:ncol(x = chunk.points)) {
+
+        }
+      }
+      col.previous[attr] <- end + 1
+    }
+    # Copy row attributes from the first loom object into the merged one
+    if (i == 1) {
+      catn()
+    }
+    # Add data to /layers
+    # Add data to /col_attrs
+    # Add data to /row_attrs, using values from the first loom object only
+    catn()
+    new.loom$flush()
+    # Close current loom file, if not open previously
+    if (is.character(x = looms[i])) {
+      this$close_all()
+    }
+  }
+  return(new.loom)
 }
 
 # #need to comment

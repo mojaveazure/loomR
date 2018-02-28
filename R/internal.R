@@ -20,9 +20,11 @@ chunkPoints <- function(data.size, chunk.size) {
 
 # Get HDF5 data types
 #
-# @param An R object
+# @param x An R object or string describing HDF5 datatype
 #
 # @return The corresponding HDF5 data type
+#
+# @ rdname getDtype
 #
 #' @import hdf5r
 #
@@ -34,9 +36,22 @@ getDtype <- function(x) {
     'numeric' = h5types$double,
     'integer' = h5types$int,
     'character' = H5T_STRING$new(size = Inf),
-    'logical' = h5types$hbool_t,
+    'logical' = H5T_LOGICAL$new(),
     stop(paste("Unknown data type:", class(x = x)))
   ))
+}
+
+# @describeIn getDtype
+#
+getDtype2 <- function(x) {
+  return(getDtype(x = switch(
+    EXPR = x,
+    'H5T_FLOAT' = numeric(),
+    'H5T_INTEGER' = integer(),
+    'H5T_STRING' = character(),
+    'H5T_LOGICAL' = logical(),
+    stop(paste("Unkown data type:", x))
+  )))
 }
 
 # Validate a loom object
