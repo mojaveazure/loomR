@@ -3,6 +3,7 @@
 .Rproj.user
 .Rhistory
 .RData
+*.Rda
 .Ruserdata
 
 # Ignore system files and directories

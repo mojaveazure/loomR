@@ -6,7 +6,8 @@ Date: 2017-11-08
 Authors@R: c(
   person(given = 'Paul', family = 'Hoffman', email = 'phoffman@nygenome.org', role = c('aut', 'cre')),
   person(given = 'Rahul', family = 'Satija', email = 'rsatija@nygenome.org', role = c('aut')),
-  person(given = 'Andrew', family = 'Butler', email = 'abutler@nygenome.org', role = c('ctb'))
+  person(given = 'Andrew', family = 'Butler', email = 'abutler@nygenome.org', role = c('ctb')),
+  person(given = 'Christoph', family = 'Hafemeister', email = 'chafemeister@nygenome.org', role = 'ctb')
   )
 Description: An interface for the single-cell RNAseq-oriented loom format. Loom files are an HDF5-based format for storing and interacting with large single-cell RNAseq datasets. loomR provides an interface for working with loom files in a loom-specific way; we provide routines for validating loom files, iterating with chunks through data within the loom file, and provide a platform for other packages to build support for loom files.
 URL: https://github.com/mojaveazure/loomR http://loompy.org/
