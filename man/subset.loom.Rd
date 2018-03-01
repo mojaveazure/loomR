@@ -19,6 +19,8 @@
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
 \item{display.progress}{Display progress as we're copying over data}
+
+\item{...}{Ignored for now}
 }
 \value{
 A loom object connected to \code{filename}
