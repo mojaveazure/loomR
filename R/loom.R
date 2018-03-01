@@ -1264,7 +1264,7 @@ subset.loom <- function(
 
 #' Combine loom files
 #'
-#' @param x A vector of loom files or filenames
+#' @param looms A vector of loom files or filenames
 #' @param filename Name for resultant vector
 #' @param chunk.size How many rows form each input loom should we stream to the merged loom file at any given time?
 #' @param order.by Optional row attribute to order each input loom by, must be one dimensional
@@ -1274,6 +1274,8 @@ subset.loom <- function(
 #' @return A loom object connected to \code{filename}
 #'
 #' @importFrom utils setTxtProgressBar
+#'
+#' @seealso \code{\link{loom-class}}
 #'
 #' @export
 #'
@@ -1515,13 +1517,12 @@ combine <- function(
     }
   }
   # Start adding loom objects
+  matrix.previous <- 0
   col.previous <- vector(mode = 'integer', length = length(x = col.attrs))
   names(x = col.previous) <- unlist(x = col.attrs)
-  lay.previous <- vector(mode = 'integer', length = length(x = layers))
-  names(x = lay.previous) <- unlist(x = layers)
   for (i in 1:length(x = looms)) {
     if (display.progress) {
-      catn("Adding loom file", i ,"of", length(x = looms))
+      catn("\nAdding loom file", i ,"of", length(x = looms))
     }
     # Open the loom file
     this <- if (is.character(x = looms[i])) {
@@ -1548,38 +1549,68 @@ combine <- function(
       cells.use <- chunk.points[1, col]:chunk.points[2, col]
       # Add /matrix for this chunk
       matrix.add <- this[['matrix']][cells.use, ]
-      new.loom[['matrix']][cells.use, ] <- matrix.add[, order.genes]
+      new.loom[['matrix']][cells.use + matrix.previous, ] <- matrix.add[, order.genes]
       # Add layers for this chunk
       for (lay in list.datasets(object = this[['layers']])) {
         lay.add <- this[['layers']][[lay]][cells.use, ]
-        new.loom[['layers']][[lay]][cells.use, ] <- lay.add[, order.genes]
+        new.loom[['layers']][[lay]][cells.use + matrix.previous, ] <- lay.add[, order.genes]
       }
       if (display.progress) {
         setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
       }
       gc()
     }
+    matrix.previous <- matrix.previous + max(chunk.points)
     # Add col_attrs for this chunk
+    if (display.progress) {
+      catn("\nAdding data to /col_attrs")
+      pb <- new.pb()
+    }
     for (attr in list.datasets(object = this[['col_attrs']], full.names = TRUE)) {
       start <- col.previous[attr]
-      end <- start + this[[attr]]$dims
+      end <- start + this[[attr]]$dims[length(x = this[[attr]]$dims)]
       if (col.ndims[[attr]] == 1) {
-        new.loom[[attr]][start:end] <- this[[attr]][]
+        new.loom[[attr]][(start + 1):end] <- this[[attr]][]
       } else {
         for (col in 1:ncol(x = chunk.points)) {
-
+          col.use <- chunk.points[1, col]:chunk.points[2, col]
+          new.loom[[attr]][col.use, (start + 1):end] <- this[[attr]][col.use, ]
         }
       }
-      col.previous[attr] <- end + 1
+      col.previous[attr] <- end
+      if (display.progress) {
+        setTxtProgressBar(
+          pb = pb,
+          value = grep(
+            pattern = attr,
+            x = list.datasets(object = this[['col_attrs']], full.names = TRUE)
+          ) / length(x = list.datasets(object = this[['col_attrs']], full.names = TRUE))
+        )
+      }
     }
     # Copy row attributes from the first loom object into the merged one
     if (i == 1) {
-      catn()
+      if (display.progress) {
+        catn("\nCopying data for /row_attrs")
+        pb <- new.pb()
+      }
+      for (attr in list.datasets(object = this, path = 'row_attrs')) {
+        new.loom[['row_attrs']]$obj_copy_from(
+          src_loc = this[['row_attrs']],
+          src_name = attr,
+          dst_name = attr
+        )
+        if (display.progress) {
+          setTxtProgressBar(
+            pb = pb,
+            value = grep(
+              pattern = attr,
+              x = list.datasets(object = this[['row_attrs']])
+            ) / length(x = list.datasets(object = this[['row_attrs']]))
+          )
+        }
+      }
     }
-    # Add data to /layers
-    # Add data to /col_attrs
-    # Add data to /row_attrs, using values from the first loom object only
-    catn()
     new.loom$flush()
     # Close current loom file, if not open previously
     if (is.character(x = looms[i])) {
