@@ -39,4 +39,4 @@ To get the HDF5 C++ API, please see the table below:
 | macOS | Using [Homebrew](https://brew.sh/), `brew install hdf5` |
 | Debian and Debian-based OSes | `sudo apt install libhdf5-dev` |
 | Red Hat-based OSes | `sudo dnf install hdf5-devel` or `sudo yum install hdf5-devel` |
-| Windows | Download precombiled binaries [here](https://github.com/mannau/h5-libwin) |
+| Windows | Download precombiled binaries from Mario Annau [here](https://github.com/mannau/h5-libwin) |
