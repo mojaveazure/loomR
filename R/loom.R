@@ -997,10 +997,11 @@ loom <- R6Class(
 #' Create a loom object
 #'
 #' @param filename The name of the new loom file
-#' @param data The data for \code{/matrix}, should be cells as rows and genes as columns
+#' @param data The data for \code{/matrix}. If cells are rows and genes are columns, set \code{do.transpose = FALSE}; otherwise, set \code{do.transpose = TRUE}
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
+#' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has rows as genes and cells as columns
 #' @param chunk.size How many rows of \code{data} should we stream to the loom file at any given time?
 #' @param overwrite Overwrite an already existing loom file?
 #'
@@ -1020,6 +1021,7 @@ create <- function(
   layers = NULL,
   chunk.dims = 'auto',
   chunk.size = 1000,
+  do.transpose = TRUE,
   overwrite = FALSE,
   display.progress = TRUE
 ) {
@@ -1040,20 +1042,21 @@ create <- function(
     chunk.dims <- as.integer(x = chunk.dims)
   }
   new.loom <- loom$new(filename = filename, mode = mode)
-  # Create the matrix
-  # new.loom$create_dataset(
-  #   name = 'matrix',
-  #   robj = data,
-  #   chunk_dims = chunk.dims
-  # )
   dtype <- getDtype(x = data[1, 1])
+  matrix.shape <- dim(x = data)
+  if (do.transpose) {
+    cate("Transposing input data: input should have cells as columns and genes as rows")
+    matrix.shape <- rev(x = matrix.shape)
+  } else {
+    cate("Not tranposing data: input should have cells as rows and genes as columns")
+  }
   new.loom$create_dataset(
     name = 'matrix',
     dtype = dtype,
-    dims = dim(x = data)
+    dims = matrix.shape
   )
   chunk.points <- chunkPoints(
-    data.size = dim(x = data)[1],
+    data.size = matrix.shape[1],
     chunk.size = chunk.size
   )
   if (display.progress) {
@@ -1062,7 +1065,13 @@ create <- function(
   for (col in 1:ncol(x = chunk.points)) {
     row.start <- chunk.points[1, col]
     row.end <- chunk.points[2, col]
-    new.loom[['matrix']][row.start:row.end, ] <- as.matrix(x = data[row.start:row.end, ])
+    data.add <- if (do.transpose) {
+      t(x = as.matrix(x = data[, row.start:row.end]))
+    } else {
+      as.matrix(x = data[row.start:row.end, ])
+    }
+    # new.loom[['matrix']][row.start:row.end, ] <- as.matrix(x = data[row.start:row.end, ])
+    new.loom[['matrix']][row.start:row.end, ] <- data.add
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
     }
@@ -1075,10 +1084,18 @@ create <- function(
   new.loom$create_group(name = 'col_attrs')
   # Check for the existance of gene or cell names
   if (!is.null(x = colnames(x = data))) {
-    new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
+    if (do.transpose) {
+      new.loom$add.col.attribute(attribute = list('cell_names' = colnames(x = data)))
+    } else {
+      new.loom$add.row.attribute(attribute = list('gene_names' = colnames(x = data)))
+    }
   }
   if (!is.null(x = rownames(x = data))) {
-    new.loom$add.col.attribute(attribute = list('cell_names' = rownames(x = data)))
+    if (do.transpose) {
+      new.loom$add.row.attribute(attribute = list('gene_names' = rownames(x = data)))
+    } else {
+      new.loom$add.col.attribute(attribute = list('cell_names' = rownames(x = data)))
+    }
   }
   # Store some constants as HDF5 attributes
   h5attr(x = new.loom, which = 'version') <- new.loom$version

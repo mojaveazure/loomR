@@ -6,12 +6,12 @@
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
   layers = NULL, chunk.dims = "auto", chunk.size = 1000,
-  overwrite = FALSE, display.progress = TRUE)
+  do.transpose = TRUE, overwrite = FALSE, display.progress = TRUE)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
 
-\item{data}{The data for \code{/matrix}, should be cells as rows and genes as columns}
+\item{data}{The data for \code{/matrix}. If cells are rows and genes are columns, set \code{do.transpose = FALSE}; otherwise, set \code{do.transpose = TRUE}}
 
 \item{gene.attrs}{A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}}
 
@@ -20,6 +20,8 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 \item{chunk.dims}{A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize}
 
 \item{chunk.size}{How many rows of \code{data} should we stream to the loom file at any given time?}
+
+\item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has rows as genes and cells as columns}
 
 \item{overwrite}{Overwrite an already existing loom file?}
 }
