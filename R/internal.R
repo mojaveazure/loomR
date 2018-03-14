@@ -396,7 +396,16 @@ new.pb <- function() {
 # @param ... Text to be output
 #
 catn <- function(...) {
-  cat(..., '\n')
+  x = list(...)
+  if (length(x = x)) {
+    if (!is.null(x = names(x = x)) && length(x = x) == 1 && names(x = x) == 'file') {
+      cat(...)
+    } else {
+      cat(..., '\n')
+    }
+  } else {
+    cat()
+  }
 }
 
 # Cat to stderr
