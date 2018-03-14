@@ -44,22 +44,22 @@ NULL
 #'   }
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
-#'     \code{dataset.use} can be the name, not \code{group/name}, unless the name is present in multiple groups.
-#'     Pass \code{MARGIN = 1} to iterate on genes or \code{MARGIN = 2} to iterate on cells for 'matrix' or any dataset in 'layers'.
-#'     To force reevaluation of the iterator object, pass \code{force.reset = TRUE}.
-#'     \code{MARGIN} does not need to be set for datasets in 'row_attrs' or 'col_attrs'.
-#'     \code{chunk.size} defaults to \code{self$chunksize}, \code{MARGIN} defaults to 2,
-#'     \code{index.use} defaults to \code{1:self$shape[MARGIN]}, \code{dataset.use} defaults to 'matrix'
+#'     \describe{
+#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
+#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+#'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+#'       \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+#'       \item{\code{force.reset}}{Force a reset of the internal iterator}
+#'     }
 #'   }
 #'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
 #'     Apply a function over a dataset within the loom file, stores the results in the loom file.
-#'     \code{name} must be the full name of the dataset ('group/name').
-#'     \code{apply} will always use the entire dataset specified in \code{dataset.use}
 #'     \describe{
-#'       \item{\code{name}}{Name of dataset to store results to}
+#'       \item{\code{name}}{Full name ('group/name')of dataset to store results to}
 #'       \item{\code{FUN}}{Function to apply}
-#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2)}
-#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by}
+#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+#'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
 #'       \item{\code{dataset.use}}{Name of dataset to use}
 #'       \item{\code{overwrite}}{Overite \code{name} if already exists}
 #'       \item{\code{display.progress}}{Display progress}
@@ -69,6 +69,15 @@ NULL
 #'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
 #'     Map a function onto a dataset within the loom file, returns the result into R.
 #'     The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
+#'     \describe{
+#'       \item{\code{FUN}}{}
+#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
+#'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+#'       \item{\code{dataset.use}}{Name of dataset to use}
+#'       \item{\code{display.progress}}{Display progress}
+#'       \item{\code{expected}}{Class of expected result ('matrix' or 'vector'), defaults to class of \code{dataset.use}}
+#'     }
 #'   }
 #'   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
 #'     Add m2 cells to a loom file.
@@ -580,6 +589,7 @@ loom <- R6Class(
           if (is.list(x = trial)) {
             trial <- unlist(x = trial)
           }
+          trial <- as.vector(x = trial)
           class(x = na.use) <- class(x = trial)
         } else {
           warning("No values passed to 'index.use' fall within the data, using all values")
@@ -587,6 +597,7 @@ loom <- R6Class(
         }
       }
       if (display.progress) {
+        catn("Running function over", length(x = batch), "batches")
         pb <- txtProgressBar(char = '=', style = 3)
       }
       # Have to initialize the dataset differently than
@@ -1156,6 +1167,8 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @param ... Ignored for now
 #'
 #' @return A loom object connected to \code{filename}
+#'
+#' @aliases subset
 #'
 #' @importFrom utils setTxtProgressBar
 #'
