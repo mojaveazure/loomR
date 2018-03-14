@@ -2,6 +2,7 @@
 % Please edit documentation in R/loom.R
 \name{subset.loom}
 \alias{subset.loom}
+\alias{subset}
 \title{Subset a loom file}
 \usage{
 \method{subset}{loom}(x, m = NULL, n = NULL, filename = NULL,
