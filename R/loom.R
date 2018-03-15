@@ -53,7 +53,7 @@ NULL
 #'     }
 #'   }
 #'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
-#'     Apply a function over a dataset within the loom file, stores the results in the loom file.
+#'     Apply a function over a dataset within the loom file, stores the results in the loom file. Will not make multidimensional attributes.
 #'     \describe{
 #'       \item{\code{name}}{Full name ('group/name')of dataset to store results to}
 #'       \item{\code{FUN}}{Function to apply}
@@ -565,8 +565,6 @@ loom <- R6Class(
       # Check how we store our results
       dataset.matrix <- ('matrix' %in% private$iter.dataset || grepl(pattern = 'layers', x = private$iter.dataset))
       results.matrix <- name.check == 3
-      # Get a connection to the group we're iterating over
-      group <- self[[results.dirname]]
       # Ensure index.use is integers within the bounds of [1, self$shape[MARGIN]]
       if (!is.null(x = index.use)) {
         # Filter index.use to values between 1 and self$shape[MARGIN]
@@ -575,34 +573,54 @@ loom <- R6Class(
         index.use <- as.vector(x = na.omit(object = index.use))
         # If we still have values, figure out NAs, otherwise set index.use to NULL
         if (length(x = index.use) > 0) {
-          # Do a trial run to figure out the class of NAs
-          na.use <- NA
-          if (display.progress) {
-            catn("Running trial to determine class of NAs")
-          }
-          trial <- switch(
-            EXPR = MARGIN,
-            '1' = self[[dataset.use]][, 1],
-            '2' = self[[dataset.use]][1, ]
-          )
-          trial <- FUN(trial, ...)
-          if (is.list(x = trial)) {
-            trial <- unlist(x = trial)
-          }
-          trial <- as.vector(x = trial)
-          class(x = na.use) <- class(x = trial)
+
         } else {
           warning("No values passed to 'index.use' fall within the data, using all values")
           index.use <- NULL
         }
       }
+      # Trial to get class of new dataset
+      # Do a trial run to figure out the class of dataset
+      na.use <- NA
       if (display.progress) {
-        catn("Running function over", length(x = batch), "batches")
+        catn("Running trial to determine class of dataset")
+      }
+      trial <- if (grepl(pattern = 'layers', x = dataset.use)) {
+        switch(
+          EXPR = MARGIN,
+          '1' = self[[dataset.use]][, 1],
+          '2' = self[[dataset.use]][1, ]
+        )
+      } else {
+        self[[dataset.use]][1]
+      }
+      trial <- FUN(trial, ...)
+      if (is.list(x = trial)) {
+        trial <- unlist(x = trial)
+      }
+      trial <- as.vector(x = trial)
+      class(x = na.use) <- class(x = trial)
+      # Get a connection to the group we're iterating over
+      group <- self[[results.dirname]]
+      # Make results dataset
+      dtype.use <- getDtype(x = na.use)
+      dims.use <- switch(
+        EXPR = results.dirname,
+        'layers' = self[['matrix']]$dims,
+        'row_attrs' = self[['matrix']]$dims[2],
+        'col_attrs' = self[['matrix']]$dims[1]
+      )
+      group$create_dataset(
+        name = results.basename,
+        dtype = dtype.use,
+        dims = dims.use
+      )
+      # Start the iteration
+      if (display.progress) {
+        catn("Writing results to", name)
         pb <- txtProgressBar(char = '=', style = 3)
       }
-      # Have to initialize the dataset differently than
-      # appending to it
-      first <- TRUE
+      # first <- TRUE
       for (i in 1:length(x = batch)) {
         # Get the indices we're iterating over
         these.indices <- self$batch.next(return.data = FALSE)
@@ -623,48 +641,26 @@ loom <- R6Class(
           self[[private$iter.datset]][chunk.indices]
         }
         chunk.data <- FUN(chunk.data, ...)
-        # If this is the first iteration
-        # Initialize the dataset within group, set first to FALSE
-        if (first) {
-          if (!is.null(x = index.use)) {
-            # If we had indices to chunk on, create a holding matrix the size
-            # of what the results should be, add the
-            holding <- switch(
-              EXPR = MARGIN,
-              '1' = matrix(nrow = nrow(x = chunk.data), ncol = length(x = these.indices)),
-              '2' = matrix(nrow = length(x = these.indices), ncol = ncol(x = chunk.data))
-            )
-            switch (
-              EXPR = MARGIN,
-              '1' = holding[, chunk.indices] <- chunk.data,
-              '2' = holding[chunk.indices, ] <- chunk.data
-            )
-            chunk.data <- holding
-          }
-          group[[results.basename]] <- chunk.data
-          first <- FALSE
-        } else {
+        if (results.matrix) {
           # If we're writign to a matrix
           # Figure out which way we're writing the data
-          if (results.matrix) {
+          switch(
+            EXPR = MARGIN,
+            '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
+            '2' = group[[results.basename]][, chunk.indices] <- chunk.data
+          )
+          if (!is.null(x = index.use)) {
             switch(
               EXPR = MARGIN,
-              '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
-              '2' = group[[results.basename]][chunk.indices, ] <- chunk.data
+              '1' = group[[results.basename]][, chunk.na] <- na.use,
+              '2' = group[[results.basename]][chunk.na, ] <- na.use
             )
-            if (!is.null(x = index.use)) {
-              switch(
-                EXPR = MARGIN,
-                '1' = group[results.basename][, chunk.na] <- na.use,
-                '2' = group[results.basename][chunk.na, ] <- na.use,
-              )
-            }
-          } else {
-            # Just write to the vector
-            group[[results.basename]][chunk.indices] <- chunk.data
-            if (!is.null(x = index.use)) {
-              group[[results.basename]][chunk.na] <- na.use
-            }
+          }
+        } else {
+          # Just write to the vector
+          group[[results.basename]][chunk.indices] <- chunk.data
+          if (!is.null(x = index.use)) {
+            group[[results.basename]][chunk.na] <- na.use
           }
         }
         if (display.progress) {

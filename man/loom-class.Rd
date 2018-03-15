@@ -66,7 +66,7 @@ A class for loom files
     }
   }
   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
-    Apply a function over a dataset within the loom file, stores the results in the loom file.
+    Apply a function over a dataset within the loom file, stores the results in the loom file. Will not make multidimensional attributes.
     \describe{
       \item{\code{name}}{Full name ('group/name')of dataset to store results to}
       \item{\code{FUN}}{Function to apply}
