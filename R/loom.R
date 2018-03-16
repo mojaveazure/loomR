@@ -585,14 +585,20 @@ loom <- R6Class(
       if (display.progress) {
         catn("Running trial to determine class of dataset")
       }
+      trial.use <- if (is.null(x = index.use)) {
+        sample(x = 1:self[['matrix']]$dims[MARGIN], size = 3, replace = FALSE)
+      } else {
+        sample(x = index.use, size = 3, replace = FALSE)
+      }
+      trial.use <- sort(x = trial.use)
       trial <- if (grepl(pattern = 'layers', x = dataset.use) || dataset.use == 'matrix') {
         switch(
           EXPR = MARGIN,
-          '1' = self[[dataset.use]][, 1],
-          '2' = self[[dataset.use]][1, ]
+          '1' = self[[dataset.use]][, trial.use],
+          '2' = self[[dataset.use]][trial.use, ]
         )
       } else {
-        self[[dataset.use]][1]
+        self[[dataset.use]][trial.use]
       }
       trial <- FUN(trial, ...)
       if (is.list(x = trial)) {
@@ -1155,9 +1161,11 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' Subset a loom file
 #'
 #' @param x A loom object
-#' @param m Rows (genes) to subset, defaults to all rows
-#' @param n Columns (cells) to subset, defaults to all columns
+#' @param m Rows (cells) to subset, defaults to all rows
+#' @param n Columns (genes) to subset, defaults to all columns
 #' @param filename Filename for new loom object, defaults to ...
+#' @param chunk.m Chunk size for m
+#' @param chunk.n Chunk size for n
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress as we're copying over data
 #' @param ... Ignored for now
@@ -1176,36 +1184,38 @@ subset.loom <- function(
   m = NULL,
   n = NULL,
   filename = NULL,
+  chunk.m = 1000,
+  chunk.n = 1000,
   overwrite = FALSE,
   display.progress = TRUE,
   ...
 ) {
+  m.all <- is.null(x = m)
+  n.all <- is.null(x = n)
+  # if (is.null(x = m) && is.null(x = n)) {
+  if (m.all && n.all) {
+    stop("Subset is set to all data, not subsetting")
+  }
   # Set some defaults
-  if (is.null(x = m)) {
-    m <- 1:x$shape[1]
+  if (m.all) { # Pull all cells
+    m <- 1:x[['matrix']]$dims[1]
   }
-  if (is.null(x = n)) {
-    n <- 1:x$shape[2]
+  if (n.all) { # Pull all genes
+    n <- 1:x[['matrix']]$dims[2]
   }
-  if (is.null(x = filename)) {
+  if (is.null(x = filename)) { # Set default filename
     filename <- paste(
       unlist(x = strsplit(x = x$filename, split = '.', fixed = TRUE)),
       collapse = '_subset.'
     )
   }
-  if (length(x = m) == 1) {
-    m <- 1:m
-  }
-  if (length(x = n) == 1) {
-    n <- 1:n
-  }
   # Ensure that m and n are within the bounds of the loom file
-  if (max(m) > x$shape[1] || max(n) > x$shape[2]) {
+  if (max(m) > x[['matrix']]$dims[1] || max(n) > x[['matrix']]$dims[2]) {
     stop(paste(
       "'m' and 'n' must be less than",
-      x$shape[1],
+      x[['matrix']]$dims[1],
       "and",
-      x$shape[2],
+      x[['matrix']]$dims[2],
       "respectively"
     ))
   }
@@ -1214,75 +1224,124 @@ subset.loom <- function(
   if (extension != 'loom') {
     filename <- paste0(filename, '.loom')
   }
-  if (display.progress) {
+  # Make the loom file
+  mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
+  if (file.exists(filename) && !overwrite) {
+    stop(paste('File', filename, 'already exists!'))
+  } else if (display.progress) {
     catn("Writing new loom file to", filename)
   }
-  # Make the loom file
-  new.loom <- create(
-    filename = filename,
-    # data = t(x = x[['matrix']][n, m]),
-    data = x[['matrix']][n, m],
-    overwrite = overwrite
+  new.loom <- loom$new(filename = filename, mode = mode)
+  # Add /matrix
+  matrix.dims <- c(length(x = m), length(x = n))
+  new.loom$create_dataset(
+    name = 'matrix',
+    dtype = getDtype2(x = class(x = x[['matrix']]$get_type())[1]),
+    dims = matrix.dims
   )
+  batch <- new.loom$batch.scan(chunk.size = chunk.m)
+  if (display.progress) {
+    catn("Adding data for /matrix")
+    pb <- new.pb()
+  }
+  for (i in 1:length(x = batch)) {
+    these.indices <- new.loom$batch.next(return.data = FALSE)
+    chunk.indices <- m[m %in% these.indices]
+    new.loom[['matrix']][these.indices, ] <- x[chunk.indices, n]
+    if (display.progress) {
+      setTxtProgressBar(pb = pb, value = i / length(x = batch))
+    }
+  }
+  if (display.progress) {
+    close(con = pb)
+  }
+  # Add groups
+  for (group in c('row_attrs', 'row_edges', 'col_attrs', 'col_edges', 'layers')) {
+    new.loom$create_group(name = group)
+  }
   # Add row attributes
   row.attrs <- list.datasets(object = x, path = 'row_attrs', full.names = TRUE)
   if (length(x = row.attrs) > 0) {
     if (display.progress) {
-      catn("\nAdding", length(x = row.attrs), "row attributes")
+      catn("Adding", length(x = row.attrs), "row attributes")
       pb <- new.pb()
       counter <- 0
     }
     for (row.attr in row.attrs) {
-      row.list <- list(x[[row.attr]][m])
-      names(x = row.list) <- basename(path = row.attr)
-      new.loom$add.row.attribute(attribute = row.list)
+      if (length(x = x[[row.attr]]$dims) == 2) {
+        new.loom[[row.attr]] <- x[[row.attr]][, n]
+      } else {
+        new.loom[[row.attr]] <- x[[row.attr]][n]
+      }
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
       }
     }
+    if (display.progress) {
+      close(con = pb)
+    }
   } else {
-    warning("No row attributes found")
+    cate("No row attributes found")
   }
   # Add col attributes
   col.attrs <- list.datasets(object = x, path = 'col_attrs', full.names = TRUE)
   if (length(x = col.attrs) > 0) {
     if (display.progress) {
-      catn("\nAdding", length(x = col.attrs), "column attributes")
+      catn("Adding", length(x = col.attrs), "column attributes")
       pb <- new.pb()
       counter <- 0
     }
     for (col.attr in col.attrs) {
-      col.list <- list(x[[col.attr]][n])
-      names(x = col.list) <- basename(path = col.attr)
-      new.loom$add.col.attribute(attribute = col.list)
+      if (length(x = x[[col.attr]]$dims) == 2) {
+        new.loom[[col.attr]] <- x[[col.attr]][, m]
+      } else {
+        new.loom[[col.attr]] <- x[[col.attr]][m]
+      }
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = col.attrs))
       }
     }
+    if (display.progress) {
+      close(con = pb)
+    }
   } else {
-    warning("No column attributes found")
+    cate("No column attributes found")
   }
   # Add layers
   layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
   if (length(x = layers) > 0) {
     if (display.progress) {
-      catn("\nAdding", length(x = layers), "layers")
+      catn("Adding", length(x = layers), "layers")
       pb <- new.pb()
-      counter <- 0
     }
+    # Initialize datasets
     for (layer in layers) {
-      layer.list <- list(x[[layer]][n, m])
-      names(x = layer.list) <- basename(path = layer)
-      new.loom$add.layer(layers = layer.list)
+      new.loom[['layers']]$create_dataset(
+        name = basename(path = layers),
+        dtype = getDtype2(x = class(x = x[[layer]]$get_type())[1]),
+        dims = matrix.dims
+      )
+    }
+    # Start adding in batches
+    batch <- new.loom$batch.scan(chunk.size = chunk.m)
+    for (i in 1:length(x = batch)) {
+      these.indices <- new.loom$batch.next(return.data = FALSE)
+      chunk.indices <- m[m %in% these.indices]
+      # Add the data for each loom for this batch
+      for (layer in layers) {
+        new.loom[[layer]][these.indices, ] <- x[[layer]][chunk.indices, n]
+      }
       if (display.progress) {
-        counter <- counter + 1
-        setTxtProgressBar(pb = pb, value = counter / length(x = layers))
+        setTxtProgressBar(pb = pb, value = i / length(x = batch))
       }
     }
+    if (display.progress) {
+      close(con = pb)
+    }
   } else {
-    warning("No layers found")
+    cate("No layers found")
   }
   new.loom$flush()
   return(new.loom)

@@ -41,7 +41,8 @@ getDtype <- function(x) {
   ))
 }
 
-# @describeIn getDtype
+# @describeIn getDtype A version of getDtype that works specifically for hdf5r types,
+# useful for getDtype2(x = class(x = object[['dataset']]$get_type())[1])
 #
 getDtype2 <- function(x) {
   return(getDtype(x = switch(
