@@ -585,7 +585,7 @@ loom <- R6Class(
       if (display.progress) {
         catn("Running trial to determine class of dataset")
       }
-      trial <- if (grepl(pattern = 'layers', x = dataset.use)) {
+      trial <- if (grepl(pattern = 'layers', x = dataset.use) || dataset.use == 'matrix') {
         switch(
           EXPR = MARGIN,
           '1' = self[[dataset.use]][, 1],
@@ -647,7 +647,7 @@ loom <- R6Class(
           switch(
             EXPR = MARGIN,
             '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
-            '2' = group[[results.basename]][, chunk.indices] <- chunk.data
+            '2' = group[[results.basename]][chunk.indices, ] <- chunk.data
           )
           if (!is.null(x = index.use)) {
             switch(
