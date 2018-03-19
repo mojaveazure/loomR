@@ -1,5 +1,6 @@
 #' @include internal.R
 #' @import hdf5r
+#' @import Matrix
 #' @importFrom R6 R6Class
 NULL
 

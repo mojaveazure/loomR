@@ -20,8 +20,9 @@ Depends:
   itertools
 Imports:
   utils,
+  Matrix,
   methods
-Collate: 
+Collate:
     'internal.R'
     'loom.R'
     'package.R'
