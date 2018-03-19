@@ -1015,7 +1015,7 @@ loom <- R6Class(
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
-#' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has rows as genes and cells as columns
+#' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns
 #' @param chunk.size How many rows of \code{data} should we stream to the loom file at any given time?
 #' @param overwrite Overwrite an already existing loom file?
 #'
@@ -1059,10 +1059,12 @@ create <- function(
   dtype <- getDtype(x = data[1, 1])
   matrix.shape <- dim(x = data)
   if (do.transpose) {
-    cate("Transposing input data: input should have cells as columns and genes as rows")
+    cate("Transposing input data: loom file will show input columns (cells) as rows and input rows (genes) as columns")
+    cate("This is to maintain compatibility with other loom tools")
     matrix.shape <- rev(x = matrix.shape)
   } else {
-    cate("Not tranposing data: input should have cells as rows and genes as columns")
+    cate("Not tranposing data: loom file will show data exactly like input")
+    cate("Please note, other loom tools will show this flipped")
   }
   new.loom$create_dataset(
     name = 'matrix',
@@ -1168,7 +1170,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @param chunk.m Chunk size for m
 #' @param chunk.n Chunk size for n
 #' @param overwrite Overwrite \code{filename} if already exists?
-#' @param display.progress Display progress as we're copying over data
+#' @param display.progress Display progress bars?
 #' @param ... Ignored for now
 #'
 #' @return A loom object connected to \code{filename}

@@ -21,7 +21,7 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 
 \item{chunk.size}{How many rows of \code{data} should we stream to the loom file at any given time?}
 
-\item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has rows as genes and cells as columns}
+\item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns}
 
 \item{overwrite}{Overwrite an already existing loom file?}
 }
