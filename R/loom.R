@@ -108,11 +108,13 @@ loom <- R6Class(
         }
         self$shape <- self[['matrix']]$dims
         # Store the chunk size
-        chunks <- h5attr(x = self, which = 'chunks')
-        chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunksize <- as.integer(x = chunks)
+        if ('chunks' %in% h5attr_names(self)) {
+          chunks <- h5attr(x = self, which = 'chunks')
+          chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
+          chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
+          chunks <- unlist(x = strsplit(x = chunks, split = ','))
+          self$chunksize <- as.integer(x = chunks)
+        }
         # Store version information
         self$version <- as.character(x = tryCatch(
           # Try getting a version
@@ -664,14 +666,17 @@ loom <- R6Class(
           warning("Not loading layers field")
         }
       } else {
-        self$layers <- unlist(x = lapply(
-          X = names(x = self[['layers']]),
-          FUN = function(n) {
-            d <- list(self[[paste('layers', n, sep = '/')]])
-            names(x = d) <- n
-            return(d)
-          }
+
+        if ('layers' %in% list.groups(object = self, path = '/', recursive = FALSE)) {
+          self$layers <- unlist(x = lapply(
+            X = names(x = self[['layers']]),
+            FUN = function(n) {
+              d <- list(self[[paste('layers', n, sep = '/')]])
+              names(x = d) <- n
+              return(d)
+            }
         ))
+        }
       }
     },
     reset_batch = function() {
@@ -818,8 +823,9 @@ validateLoom <- function(object) {
   if (root.datasets != 'matrix') {
     stop("The root dataset must be called '/matrix'")
   }
-  # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
-  required.groups <- c('row_attrs', 'col_attrs', 'layers')
+  # There must be groups called '/col_attrs', '/row_attrs'
+  # layers is optional-http://linnarssonlab.org/loompy/format/index.html#specification
+  required.groups <- c('row_attrs', 'col_attrs')
   dim.matrix <- object[[root.datasets]]$dims # Columns x Rows
   names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
@@ -828,7 +834,7 @@ validateLoom <- function(object) {
     paste(required.groups, collapse = "', '"),
     "'"
   )
-  if (length(x = root.groups) != 3) {
+  if (length(x = root.groups) != 2) {
     stop(group.msg)
   }
   if (!all(required.groups %in% root.groups)) {
@@ -850,9 +856,12 @@ validateLoom <- function(object) {
       }
     }
   ))
-  for (dataset in list.datasets(object = object[['/layers']])) {
-    if (any(object[[paste('layers', dataset, sep = '/')]]$dims != dim.matrix)) {
-      stop(paste("All datasets in '/layers' must be", dim.matrix[1], 'by', dim.matrix[2]))
+
+  if ('layers' %in% root.groups) {
+    for (dataset in list.datasets(object = object[['/layers']])) {
+      if (any(object[[paste('layers', dataset, sep = '/')]]$dims != dim.matrix)) {
+        stop(paste("All datasets in '/layers' must be", dim.matrix[1], 'by', dim.matrix[2]))
+      }
     }
   }
 }
