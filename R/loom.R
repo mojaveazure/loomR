@@ -197,6 +197,9 @@ loom <- R6Class(
       private$load_attributes(MARGIN = 1)
       private$load_attributes(MARGIN = 2)
     },
+    update.shape = function() {
+        self$shape <- rev(x = self[['matrix']]$dims)
+    },
     # Addding attributes and layers
     add.layer = function(layers, chunk.size = 1000, overwrite = FALSE) {
       if (self$mode == 'r') {
@@ -587,7 +590,7 @@ loom <- R6Class(
         catn("Running trial to determine class of dataset")
       }
       trial.use <- if (is.null(x = index.use)) {
-        sample(x = 1:self[['matrix']]$dims[MARGIN], size = 3, replace = FALSE)
+        sample(x = 1:self$shape[MARGIN], size = 3, replace = FALSE)
       } else {
         sample(x = index.use, size = 3, replace = FALSE)
       }
@@ -939,14 +942,18 @@ loom <- R6Class(
         stop('Invalid attribute dimension')
       )
       group <- self[[attribute]]
-      attributes <- unlist(x = lapply(
-        X = names(x = group),
-        FUN = function(x) {
-          d <- list(group[[x]])
-          names(x = d) <- x
-          return(d)
-        }
-      ))
+      if (length(x = names(x = group)) > 0) {
+        attributes <- unlist(x = lapply(
+          X = names(x = group),
+          FUN = function(x) {
+            d <- list(group[[x]])
+            names(x = d) <- x
+            return(d)
+          }
+        ))
+      } else {
+        attributes <- NULL
+      }
       if (MARGIN == 1) {
         self$row.attrs <- attributes
       } else if (MARGIN == 2) {
@@ -958,7 +965,7 @@ loom <- R6Class(
         if (getOption(x = 'verbose')) {
           warning("Not loading layers field")
         }
-      } else {
+      } else if (length(x = names(x = self[['layers']])) > 0) {
         self$layers <- unlist(x = lapply(
           X = names(x = self[['layers']]),
           FUN = function(n) {
@@ -1195,7 +1202,6 @@ subset.loom <- function(
 ) {
   m.all <- is.null(x = m)
   n.all <- is.null(x = n)
-  # if (is.null(x = m) && is.null(x = n)) {
   if (m.all && n.all) {
     stop("Subset is set to all data, not subsetting")
   }
@@ -1242,6 +1248,7 @@ subset.loom <- function(
     dtype = getDtype2(x = class(x = x[['matrix']]$get_type())[1]),
     dims = matrix.dims
   )
+  new.loom$shape <- rev(x = matrix.dims)
   batch <- new.loom$batch.scan(chunk.size = chunk.m)
   if (display.progress) {
     catn("Adding data for /matrix")
@@ -1249,8 +1256,8 @@ subset.loom <- function(
   }
   for (i in 1:length(x = batch)) {
     these.indices <- new.loom$batch.next(return.data = FALSE)
-    chunk.indices <- m[m %in% these.indices]
-    new.loom[['matrix']][these.indices, ] <- x[chunk.indices, n]
+    chunk.indices <- m[these.indices]
+    new.loom[['matrix']][these.indices, ] <- x[['matrix']][chunk.indices, n]
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = i / length(x = batch))
     }
@@ -1331,7 +1338,7 @@ subset.loom <- function(
     batch <- new.loom$batch.scan(chunk.size = chunk.m)
     for (i in 1:length(x = batch)) {
       these.indices <- new.loom$batch.next(return.data = FALSE)
-      chunk.indices <- m[m %in% these.indices]
+      chunk.indices <- m[these.indices]
       # Add the data for each loom for this batch
       for (layer in layers) {
         new.loom[[layer]][these.indices, ] <- x[[layer]][chunk.indices, n]
@@ -1347,6 +1354,7 @@ subset.loom <- function(
     cate("No layers found")
   }
   new.loom$flush()
+  new.loom$load.fields()
   return(new.loom)
 }
 
