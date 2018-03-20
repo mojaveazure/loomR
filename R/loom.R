@@ -1329,7 +1329,7 @@ subset.loom <- function(
     # Initialize datasets
     for (layer in layers) {
       new.loom[['layers']]$create_dataset(
-        name = basename(path = layers),
+        name = basename(path = layer),
         dtype = getDtype2(x = class(x = x[[layer]]$get_type())[1]),
         dims = matrix.dims
       )
