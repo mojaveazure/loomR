@@ -1099,9 +1099,10 @@ create <- function(
   new.loom$matrix <- new.loom[['matrix']]
   new.loom$shape <- rev(x = new.loom[['matrix']]$dims)
   # Groups
-  new.loom$create_group(name = 'layers')
-  new.loom$create_group(name = 'row_attrs')
-  new.loom$create_group(name = 'col_attrs')
+  groups <- c('layers', 'row_attrs', 'col_attrs', 'row_graphs', 'col_graphs')
+  for (group in groups) {
+    new.loom$create_group(name = group)
+  }
   # Check for the existance of gene or cell names
   if (!is.null(x = colnames(x = data))) {
     if (do.transpose) {
@@ -1263,7 +1264,7 @@ subset.loom <- function(
     close(con = pb)
   }
   # Add groups
-  for (group in c('row_attrs', 'row_edges', 'col_attrs', 'col_edges', 'layers')) {
+  for (group in c('row_attrs', 'row_graphs', 'col_attrs', 'col_graphs', 'layers')) {
     new.loom$create_group(name = group)
   }
   # Add row attributes
@@ -1574,11 +1575,10 @@ combine <- function(
   }
   # Create the new HDF5 file and the required groups
   new.loom <- loom$new(filename = filename, mode = mode)
-  new.loom$create_group(name = 'layers')
-  new.loom$create_group(name = "row_attrs")
-  new.loom$create_group(name = "col_attrs")
-  new.loom$create_group(name = "row_edges")
-  new.loom$create_group(name = "col_edges")
+  groups <- c('layers', "row_attrs", "col_attrs", "row_graphs", "col_graphs")
+  for (group in groups) {
+    new.loom$create_group(name = group)
+  }
   # Initialize the '/matrix' dataset as well as datasets in 'col_attrs' and 'layers'
   new.loom$create_dataset(
     name = 'matrix', # Name is '/matrix'
