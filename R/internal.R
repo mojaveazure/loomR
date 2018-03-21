@@ -77,7 +77,7 @@ validateLoom <- function(object) {
     stop("The root dataset must be called '/matrix'")
   }
   # There must be groups called '/col_attrs', '/row_attrs', and '/layers'
-  required.groups <- c('row_attrs', 'col_attrs', 'layers', 'row_edges', 'col_edges')
+  required.groups <- c('row_attrs', 'col_attrs', 'layers', 'row_graphs', 'col_graphs')
   dim.matrix <- object[['matrix']]$dims # Columns x Rows
   names(x = dim.matrix) <- required.groups[c(2, 1)]
   root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
@@ -91,6 +91,20 @@ validateLoom <- function(object) {
     "Reopen in 'r+' mode to automatically add missing groups",
     sep = '\n'
   )
+  if (any(grepl(pattern = 'edges', x = root.groups))) {
+    if (object$mode != 'r') {
+      cate("Moving edge groups to graph groups to conform to loom v2.0.1")
+      edges <- grep(pattern = 'edges', x = root.groups, value = TRUE)
+      for (group in edges) {
+        graph <- gsub(pattern = 'edges', replacement = 'graphs', x = group)
+        object$link_move_to(dst_loc = object, dst_name = graph, src_name = group)
+      }
+      root.groups <- list.groups(object = object, path = '/', recursive = FALSE)
+    } else {
+      object$close_all()
+      stop(reopen.msg)
+    }
+  }
   if (length(x = root.groups) > length(x = required.groups)) {
     stop(group.msg)
   } else if (length(x = root.groups) < length(x = required.groups)) {
@@ -127,6 +141,34 @@ validateLoom <- function(object) {
         print(object[[group]][[dataset]])
         print(dim.matrix)
         stop("All datasets in group ", group, " must be of length ", dim.matrix[group])
+      }
+    }
+  }
+  # Check row and column graphs
+  graph.groups <- grep(pattern = 'graphs', x = required.groups, value = TRUE)
+  graph.msg <- "There can only be three datasets in a graph: 'a', 'b', and 'w'"
+  for (group in graph.groups) {
+    group.datasets <- list.datasets(object = object[[group]], recursive = FALSE)
+    if (length(x = group.datasets) > 0) {
+      stop(paste("All datasets in", group, "must be in a graph group"))
+    }
+    graphs <- list.groups(object = object[[group]], full.names = TRUE, recursive = FALSE)
+    for (graph in graphs) {
+      graph.datasets <- list.datasets(object = object[[graph]], full.names = TRUE)
+      if (length(x = graph.datasets) != 3) {
+        stop(graph.msg)
+      }
+      if (!all(basename(path = graph.datasets) %in% c('a', 'b', 'w'))) {
+        stop(graph.msg)
+      }
+      graph.lengths <- lapply(
+        X = graph.datasets,
+        FUN = function(dset) {
+          return(object[[dset]]$dims)
+        }
+      )
+      if (unique(x = length(x = graph.lengths)) != 1) {
+        stop("All graph datasets must be the same length")
       }
     }
   }
