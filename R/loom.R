@@ -400,7 +400,7 @@ loom <- R6Class(
       attr.paths <- paste0(attribute.layer, "/", attribute.names)
       # keep only the one-dimensional attributes
       dims <- sapply(attr.paths, function(x) length(self[[x]]$dims))
-      data.lst <- lapply(attr.paths[dims == 1], function(x) data.frame(self[[x]][]))
+      data.lst <- lapply(attr.paths[dims == 1], function(x) data.frame(self[[x]][], stringsAsFactors = FALSE))
       combined.df <- Reduce(cbind, data.lst)
       colnames(combined.df) <- attribute.names[dims == 1]
       if (attribute.layer == "col_attrs") {
