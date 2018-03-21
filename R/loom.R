@@ -717,10 +717,7 @@ loom <- R6Class(
       # And what the shape of our dataset is
       results.matrix <- TRUE
       dataset.matrix <- TRUE
-      if (grepl(pattern = 'col_attrs', x = private$iter.dataset)) {
-        results.matrix <- FALSE
-        dataset.matrix <- FALSE
-      } else if (grepl(pattern = 'row_attrs', x = private$iter.dataset)) {
+      if (grepl(pattern = 'col_attrs', x = dataset.use) || grepl(pattern = 'row_attrs', x = dataset.use)) {
         results.matrix <- FALSE
         dataset.matrix <- FALSE
       }
