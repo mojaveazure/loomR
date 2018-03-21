@@ -388,28 +388,26 @@ loom <- R6Class(
         stop("Invalid attribute.layer. Please select either 'row' or 'col'.")
       }
       attribute.layer <- paste0(attribute.layer, "_attrs")
+      # by default return all attributes
+      if (is.null(attribute.names)) {
+        attribute.names <- self[[attribute.layer]]$names
+      }
       # check that attribute names are present
       if (!all(attribute.names %in% self[[attribute.layer]]$names)) {
         invalid.names <- attribute.names[which(!attribute.names %in% self[[attribute.layer]]$names)]
         stop(paste0("Invalid attribute.names: ", paste0(invalid.names, collapse = ", ")))
       }
-      if (attribute.layer == "row_attrs") {
-        combined.df <- data.frame(
-          self[[paste0(attribute.layer, "/", attribute.names[1])]][],
-          row.names = self[[paste0(attribute.layer, "/", row.names)]][]
-        )
+      attr.paths <- paste0(attribute.layer, "/", attribute.names)
+      # keep only the one-dimensional attributes
+      dims <- sapply(attr.paths, function(x) length(self[[x]]$dims))
+      data.lst <- lapply(attr.paths[dims == 1], function(x) data.frame(self[[x]][]))
+      combined.df <- Reduce(cbind, data.lst)
+      colnames(combined.df) <- attribute.names[dims == 1]
+      if (attribute.layer == "col_attrs") {
+        rownames(combined.df) <- self[[paste0(attribute.layer, "/", col.names)]][]
       } else {
-        combined.df <- data.frame(
-          self[[paste0(attribute.layer, "/", attribute.names[1])]][],
-          row.names = self[[paste0(attribute.layer, "/", col.names)]][]
-        )
+        rownames(combined.df) <- self[[paste0(attribute.layer, "/", row.names)]][]
       }
-      if (length(x = attribute.names) > 1) {
-        for (i in 2:length(x = attribute.names)) {
-          combined.df[, attribute.names[i]] <- self[[paste0(attribute.layer, "/", attribute.names[i])]][]
-        }
-      }
-      colnames(x = combined.df) <- attribute.names
       # check if any row is all NAs
       rows.to.remove <- unname(obj = which(x = apply(
         X = combined.df,
