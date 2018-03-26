@@ -547,6 +547,21 @@ loom <- R6Class(
         stop("'MARGIN' must be 1 or 2")
       )
       group <- paste0(group, '_graphs')
+      # Validate graph
+      if (!name %in% list.groups(object = self[[group]], full.names = FALSE, recursive = FALSE)) {
+        stop(paste("Cannot find a graph named", name, "in", group))
+      }
+      graph.datasets <- list.datasets(object = self[[group]][[name]], full.names = FALSE)
+      if (length(x = graph.datasets) != 3) {
+        stop(paste0(
+          "Malformed graph: wrong number of components for graph (",
+          length(x = graph.datasets),
+          ")"
+        ))
+      }
+      if (!all(graph.datasets %in% c('a', 'b', 'w'))) {
+        stop("Malformed graph: unknown dataset names")
+      }
       graph <- sparseMatrix(
         i = self[[group]][[name]][['a']][] + 1,
         j = self[[group]][[name]][['b']][],
