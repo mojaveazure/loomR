@@ -189,7 +189,7 @@ validateLoom <- function(object) {
           return(object[[dset]]$dims)
         }
       )
-      if (unique(x = length(x = graph.lengths)) != 1) {
+      if (length(x = unique(x = graph.lengths)) != 1) {
         stop("All graph datasets must be the same length")
       }
     }
