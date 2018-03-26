@@ -36,6 +36,20 @@ A class for loom files
 \section{Methods}{
 
 \describe{
+  \item{\code{add.graph(a, b, w, name, MARGIN, overwrite)}, \code{add.graph.matrix(mat, name, MARGIN, overwrite)}}{
+    Add a graph to the loom object; can add either in coorindate format (\code{add.graph}) or matrix format (\code{add.graph.matrix}).
+    Stores graph in coordinate format as \code{[row, col]_graphs/name/a} (row indices),
+    \code{[row, col]_graphs/name/b} (column indices), and \code{[row, col]_graphs/name/w} (values)
+    \describe{
+      \item{\code{a}}{Integer vector of row indices for graph, must be the same lengths as \code{b} and \code{w}}
+      \item{\code{b}}{Integer vector of column indices for graph, must be the same lengths as \code{a} and \code{w}}
+      \item{\code{w}}{Numeric vector of values for graph, must be the same lengths as \code{a} and \code{b}}
+      \item{\code{mat}}{Graph provided as a matrix (sparse or dense) or data.frame}
+      \item{\code{name}}{Name to store graph, will end up being \code{col_graphs/name} or \code{row_graphs/name}, depending on \code{MARGIN}}
+      \item{\code{MARGIN}}{Store the graph in \code{row_graphs} (1) or \code{col_graphs} (2), defaults to 2}
+      \item{\code{overwrite}}{Can overwrite existing graph?}
+    }
+  }
   \item{\code{add.layer(layer, chunk.size, overwrite)}}{
     Add a data layer to this loom file, must be the same dimensions as \code{/matrix}
     \describe{
@@ -54,6 +68,16 @@ A class for loom files
   }
   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
     Add row or column attributes
+  }
+  \item{\code{get.graph(name, MARGIN)}}{
+    Get a graph as a sparse matrix
+    \describe{
+      \item{\code{name}}{Name of the graph, can be either the basename or full name of the grpah}
+      \item{\code{MARGIN}}{
+        Load the graph from \code{row_graphs} (1) or \code{col_graphs} (2), defaults to 2.
+        Ignored if full path to graph is passed to \code{name}
+      }
+    }
   }
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.

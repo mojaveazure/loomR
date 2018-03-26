@@ -18,6 +18,28 @@ chunkPoints <- function(data.size, chunk.size) {
   ))
 }
 
+
+# Convert sparse matrix pointers to column indicies
+#
+# A function to get the column (j) indices of a sparse matrix from the pointers (p)
+#
+# @param p A vector of sparse matrix pointers
+#
+# @return A vector of column (j) indices
+#
+# @examples
+# dat <- c(0, 0, 1, 4, 0, 2, 0, 9, 0)
+# smat <- Matrix::Matrix(data = dat, nrow = 3, sparse = TRUE)
+# PointerToIndex(p = smat@p)
+#
+PointerToIndex <- function(p) {
+  # From StackOverflow
+  # https://stackoverflow.com/questions/20008200/r-constructing-sparse-matrix
+  dp <- diff(x = p)
+  j <- rep.int(x = seq_along(along.with = dp), times = dp)
+  return(j)
+}
+
 # Get HDF5 data types
 #
 # @param x An R object or string describing HDF5 datatype

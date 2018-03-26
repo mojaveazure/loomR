@@ -24,6 +24,20 @@ NULL
 #'
 #' @section Methods:
 #' \describe{
+#'   \item{\code{add.graph(a, b, w, name, MARGIN, overwrite)}, \code{add.graph.matrix(mat, name, MARGIN, overwrite)}}{
+#'     Add a graph to the loom object; can add either in coorindate format (\code{add.graph}) or matrix format (\code{add.graph.matrix}).
+#'     Stores graph in coordinate format as \code{[row, col]_graphs/name/a} (row indices),
+#'     \code{[row, col]_graphs/name/b} (column indices), and \code{[row, col]_graphs/name/w} (values)
+#'     \describe{
+#'       \item{\code{a}}{Integer vector of row indices for graph, must be the same lengths as \code{b} and \code{w}}
+#'       \item{\code{b}}{Integer vector of column indices for graph, must be the same lengths as \code{a} and \code{w}}
+#'       \item{\code{w}}{Numeric vector of values for graph, must be the same lengths as \code{a} and \code{b}}
+#'       \item{\code{mat}}{Graph provided as a matrix (sparse or dense) or data.frame}
+#'       \item{\code{name}}{Name to store graph, will end up being \code{col_graphs/name} or \code{row_graphs/name}, depending on \code{MARGIN}}
+#'       \item{\code{MARGIN}}{Store the graph in \code{row_graphs} (1) or \code{col_graphs} (2), defaults to 2}
+#'       \item{\code{overwrite}}{Can overwrite existing graph?}
+#'     }
+#'   }
 #'   \item{\code{add.layer(layer, chunk.size, overwrite)}}{
 #'     Add a data layer to this loom file, must be the same dimensions as \code{/matrix}
 #'     \describe{
@@ -42,6 +56,16 @@ NULL
 #'   }
 #'   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
 #'     Add row or column attributes
+#'   }
+#'   \item{\code{get.graph(name, MARGIN)}}{
+#'     Get a graph as a sparse matrix
+#'     \describe{
+#'       \item{\code{name}}{Name of the graph, can be either the basename or full name of the grpah}
+#'       \item{\code{MARGIN}}{
+#'         Load the graph from \code{row_graphs} (1) or \code{col_graphs} (2), defaults to 2.
+#'         Ignored if full path to graph is passed to \code{name}
+#'       }
+#'     }
 #'   }
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
@@ -200,7 +224,85 @@ loom <- R6Class(
     update.shape = function() {
         self$shape <- rev(x = self[['matrix']]$dims)
     },
-    # Addding attributes and layers
+    # Addding attributes, layers, and graphs
+    add.graph = function(a, b, w, name, MARGIN = 2, overwrite = FALSE) {
+      if (self$mode == 'r') {
+        stop(private$err_mode)
+      }
+      # Coerce datasets to proper types
+      a <- as.integer(x = a)
+      b <- as.integer(x = b)
+      w <- as.double(x = w)
+      # Check lengths of each vector
+      graph.lengths <- vapply(
+        X = list(a, b, w),
+        FUN = length,
+        FUN.VALUE = integer(length = 1L)
+      )
+      graph.lengths <- unique(x = graph.lengths)
+      if (length(x = graph.lengths)) {
+        stop("'a', 'b', and 'w' must all be the same length")
+      }
+      # Check the name, automatically assign a group if provided in `name`
+      if (dirname(path = name) != '.') {
+        name.group <- dirname(path = name)
+        MARGIN <- if (grepl(pattern = 'col', x = name.group)) {
+          2
+        } else if (grepl(pattern = 'row', x = name.group)) {
+          1
+        } else {
+          cate("Unknown group:", name.group)
+          cate("Using", MARGIN, "as default")
+          MARGIN
+        }
+      }
+      # Shorten `name` to the just the basename
+      name <- basename(path = name)
+      # Assign group
+      group <- switch(
+        EXPR = MARGIN,
+        '1' = 'row',
+        '2' = 'col',
+        stop("'MARGIN' must be 1 or 2")
+      )
+      group <- paste0(group, '_graphs')
+      # Check for existance of previous graph
+      if (name %in% names(x = self[[group]])) {
+        if (overwrite) {
+          self[[group]]$link_delete(name = name)
+        } else {
+          stop(paste("A graph with the name", name, "exists already!"))
+        }
+      }
+      # Create our datasets
+      self[[group]]$create_group(name = name)
+      self[[group]][[name]][['a']] <- a
+      self[[group]][[name]][['b']] <- b
+      self[[group]][[name]][['w']] <- w
+      invisible(x = self)
+    },
+    add.graph.matrix = function(mat, name, MARGIN = 2, overwrite = FALSE) {
+      if (!inherits(x = mat, what = 'dgCMatrix')) {
+        mat <- Matrix(
+          data = mat,
+          nrow = nrow(x = mat),
+          ncol = ncol(x = mat),
+          sparse = TRUE
+        )
+      }
+      a <- mat@i
+      b <- PointerToIndex(p = mat@p)
+      w <- mat@x
+      self$add.graph(
+        a = a,
+        b = b,
+        w = w,
+        name = name,
+        MARGIN = MARGIN,
+        overwrite = overwrite
+      )
+      invisible(x = self)
+    },
     add.layer = function(layers, chunk.size = 1000, overwrite = FALSE) {
       if (self$mode == 'r') {
         stop(private$err_mode)
@@ -420,6 +522,37 @@ loom <- R6Class(
         combined.df <- combined.df[-rows.to.remove, ]
       }
       return(combined.df)
+    },
+    get.graph  = function(name, MARGIN = 2) {
+      # Check the name, automatically assign a group if provided in `name`
+      if (dirname(path = name) != '.') {
+        name.group <- dirname(path = name)
+        MARGIN <- if (grepl(pattern = 'col', x = name.group)) {
+          2
+        } else if (grepl(pattern = 'row', x = name.group)) {
+          1
+        } else {
+          cate("Unknown group:", name.group)
+          cate("Using", MARGIN, "as default")
+          MARGIN
+        }
+      }
+      # Shorten `name` to the just the basename
+      name <- basename(path = name)
+      # Assign group
+      group <- switch(
+        EXPR = MARGIN,
+        '1' = 'row',
+        '2' = 'col',
+        stop("'MARGIN' must be 1 or 2")
+      )
+      group <- paste0(group, '_graphs')
+      graph <- sparseMatrix(
+        i = self[[group]][[name]][['a']][] + 1,
+        j = self[[group]][[name]][['b']][],
+        x = self[[group]][[name]][['w']][]
+      )
+      return(graph)
     },
     # Chunking functions
     batch.scan = function(
