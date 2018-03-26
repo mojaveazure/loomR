@@ -240,7 +240,7 @@ loom <- R6Class(
         FUN.VALUE = integer(length = 1L)
       )
       graph.lengths <- unique(x = graph.lengths)
-      if (length(x = graph.lengths)) {
+      if (length(x = graph.lengths) > 1) {
         stop("'a', 'b', and 'w' must all be the same length")
       }
       # Check the name, automatically assign a group if provided in `name`
@@ -701,7 +701,9 @@ loom <- R6Class(
       dataset.matrix <- ('matrix' %in% private$iter.dataset || grepl(pattern = 'layers', x = private$iter.dataset))
       results.matrix <- name.check == 3
       # Ensure index.use is integers within the bounds of [1, self$shape[MARGIN]]
-      if (!is.null(x = index.use)) {
+      if (is.null(x = index.use)) {
+        index.use <- 1:self$shape[MARGIN]
+      } else {
         # Filter index.use to values between 1 and self$shape[MARGIN]
         index.use <- as.integer(x = index.use)
         index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
@@ -717,9 +719,9 @@ loom <- R6Class(
       # Trial to get class of new dataset
       # Do a trial run to figure out the class of dataset
       na.use <- NA
-      if (display.progress) {
-        catn("Running trial to determine class of dataset")
-      }
+      # if (display.progress) {
+      #   catn("Running trial to determine class of dataset")
+      # }
       trial.use <- if (is.null(x = index.use)) {
         sample(x = 1:self$shape[MARGIN], size = 3, replace = FALSE)
       } else {
@@ -764,22 +766,33 @@ loom <- R6Class(
       # first <- TRUE
       for (i in 1:length(x = batch)) {
         # Get the indices we're iterating over
-        these.indices <- self$batch.next(return.data = FALSE)
-        if (is.null(x = index.use)) {
-          chunk.indices <- these.indices
-        } else {
-          chunk.indices <- index.use[index.use %in% these.indices]
-          chunk.na <- these.indices[!(these.indices %in% chunk.indices)]
+        chunk.indices <- self$batch.next(return.data = FALSE)
+        indices.use <- chunk.indices[chunk.indices %in% index.use]
+        indices.use <- indices.use - chunk.indices[1] + 1
+        if (length(x = indices.use) < 1) {
+          if (display.progress) {
+            setTxtProgressBar(pb = pb, value = i / length(x = batch))
+          }
+          next
         }
         # Get the data and apply FUN
         chunk.data <- if (dataset.matrix) {
           switch(
             EXPR = MARGIN,
-            '1' = self[[dataset.use]][, chunk.indices], # Chunk genes
-            '2' = self[[dataset.use]][chunk.indices, ] # Chunk cells
+            '1' = {
+              # Chunk genes
+              x <- self[[dataset.use]][, chunk.indices]
+              x[, indices.use]
+            },
+            '2' = {
+              # Chunk cells
+              x <- self[[dataset.use]][chunk.indices, ]
+              x[indices.use, ]
+            }
           )
         } else {
-          self[[private$iter.datset]][chunk.indices]
+          x <- self[[private$iter.datset]][chunk.indices]
+          x[indices.use]
         }
         chunk.data <- FUN(chunk.data, ...)
         if (results.matrix) {
@@ -787,23 +800,30 @@ loom <- R6Class(
           # Figure out which way we're writing the data
           switch(
             EXPR = MARGIN,
-            '1' = group[[results.basename]][, chunk.indices] <- chunk.data,
-            '2' = group[[results.basename]][chunk.indices, ] <- chunk.data
+            '1' = {
+              chunk.full <- matrix(
+                nrow = nrow(x = chunk.data),
+                ncol = length(x = chunk.indices)
+              )
+              chunk.full[, indices.use] <- chunk.data
+              group[[results.basename]][, chunk.indices] <- chunk.full
+            },
+            '2' = {
+              chunk.full <- matrix(
+                nrow = length(x = chunk.indices),
+                ncol = ncol(x = chunk.data)
+              )
+              chunk.full[indices.use, ] <- chunk.data
+              group[[results.basename]][chunk.indices, ] <- chunk.full
+            }
           )
-          if (!is.null(x = index.use)) {
-            switch(
-              EXPR = MARGIN,
-              '1' = group[[results.basename]][, chunk.na] <- na.use,
-              '2' = group[[results.basename]][chunk.na, ] <- na.use
-            )
-          }
         } else {
           # Just write to the vector
-          group[[results.basename]][chunk.indices] <- chunk.data
-          if (!is.null(x = index.use)) {
-            group[[results.basename]][chunk.na] <- na.use
-          }
+          chunk.full <- vector(length = length(x = chunk.indices))
+          chunk.full[indices.use] <- chunk.data
+          group[[results.basename]][chunk.indices] <- chunk.full
         }
+        gc(verbose = FALSE)
         if (display.progress) {
           setTxtProgressBar(pb = pb, value = i / length(x = batch))
         }
