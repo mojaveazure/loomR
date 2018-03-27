@@ -720,6 +720,7 @@ loom <- R6Class(
         index.use <- 1:self$shape[MARGIN]
       } else {
         # Filter index.use to values between 1 and self$shape[MARGIN]
+        index.use <- sort(x = index.use)
         index.use <- as.integer(x = index.use)
         index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
         index.use <- as.vector(x = na.omit(object = index.use))
@@ -728,7 +729,7 @@ loom <- R6Class(
 
         } else {
           warning("No values passed to 'index.use' fall within the data, using all values")
-          index.use <- NULL
+          index.use <- 1:self$shape[MARGIN]
         }
       }
       # Trial to get class of new dataset
