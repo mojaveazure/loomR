@@ -57,6 +57,15 @@ NULL
 #'   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
 #'     Add row or column attributes
 #'   }
+#'   \item{\code{get.attribute.df}}{
+#'     Get a group of row or column attributes as a data frame, will only return attributes that have one dimension
+#'     \describe{
+#'       \item{\code{attribute.layer}}{Either 'row' or 'col' to get row- or column-attributes}
+#'       \item{\code{attribute.names}}{A vector of attribute dataset basenames}
+#'       \item{\code{row.names}}{Basename of the rownames dataset}
+#'       \item{\code{col.names}}{Basename of the colnames dataset}
+#'     }
+#'   }
 #'   \item{\code{get.graph(name, MARGIN)}}{
 #'     Get a graph as a sparse matrix
 #'     \describe{
@@ -75,6 +84,7 @@ NULL
 #'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
 #'       \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
 #'       \item{\code{force.reset}}{Force a reset of the internal iterator}
+#'       \item{\code{return.data}}{Return data for a given chunk, if \code{FALSE}, returns the indices across \code{MARGIN} for said chunk}
 #'     }
 #'   }
 #'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
@@ -101,16 +111,24 @@ NULL
 #'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
 #'       \item{\code{dataset.use}}{Name of dataset to use}
 #'       \item{\code{display.progress}}{Display progress}
-#'       \item{\code{expected}}{Class of expected result ('matrix' or 'vector'), defaults to class of \code{dataset.use}}
+#'       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
 #'     }
 #'   }
 #'   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
-#'     Add m2 cells to a loom file.
+#'     Add cells to a loom file.
 #'     \describe{
-#'       \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
-#'       \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
-#'       \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
-#'       \item{\code{display.progress}}{display progress}
+#'       \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+#'       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
+#'       \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+#'       \item{\code{display.progress}}{Display progress}
+#'     }
+#'   }
+#'   \item{\code{add.loom(other, other.key, self.key, ...)}}{
+#'     \describe{
+#'       \item{\code{other}}{An object of class \code{loom} or a filename of another loom file}
+#'       \item{\code{other.key}}{Row attribute in \code{other} to add by}
+#'       \item{\code{self.key}}{Row attribute in this loom file to add by}
+#'       \item{\code{...}}{Ignored for now}
 #'     }
 #'   }
 #' }
@@ -722,12 +740,10 @@ loom <- R6Class(
         # Filter index.use to values between 1 and self$shape[MARGIN]
         index.use <- sort(x = index.use)
         index.use <- as.integer(x = index.use)
-        index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
+        index.use <- index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
         index.use <- as.vector(x = na.omit(object = index.use))
         # If we still have values, figure out NAs, otherwise set index.use to NULL
-        if (length(x = index.use) > 0) {
-
-        } else {
+        if (length(x = index.use) == 0) {
           warning("No values passed to 'index.use' fall within the data, using all values")
           index.use <- 1:self$shape[MARGIN]
         }
@@ -862,19 +878,17 @@ loom <- R6Class(
       index.use = NULL,
       dataset.use = 'matrix',
       display.progress = TRUE,
-      expected = NULL,
       ...
     ) {
       if (!inherits(x = FUN, what = 'function')) {
         stop("FUN must be a function")
       }
-      # Checks datset, index, and MARGIN
+      # Checks datset and MARGIN
       # Sets full dataset path in private$iter.dataset
       # Sets proper MARGIN in private$iter.margin
       batch <- self$batch.scan(
         chunk.size = chunk.size,
         MARGIN = MARGIN,
-        index.use = index.use,
         dataset.use = dataset.use,
         force.reset = TRUE
       )
@@ -882,19 +896,26 @@ loom <- R6Class(
       dataset.use <- private$iter.dataset
       # Check how we store our results
       # And what the shape of our dataset is
-      results.matrix <- TRUE
-      dataset.matrix <- TRUE
-      if (grepl(pattern = 'col_attrs', x = dataset.use) || grepl(pattern = 'row_attrs', x = dataset.use)) {
-        results.matrix <- FALSE
-        dataset.matrix <- FALSE
-      }
-      if (!is.null(x = expected)) {
-        results.matrix <- switch(
-          EXPR = expected,
-          'vector' = FALSE,
-          'matrix' = TRUE,
-          stop("'expected' must be one of 'matrix', 'vector', or NULL")
-        )
+      dataset.matrix <- any(vapply(
+        X = c('matrix', 'layers'),
+        FUN = grepl,
+        FUN.VALUE = logical(length = 1L),
+        x = dataset.use
+      ))
+      # Ensure that index.use is integers within the bounds of [1, self$shape[MARGIN]]
+      if (is.null(x = index.use)) {
+        index.use <- 1L:self$shape[MARGIN]
+      } else {
+        # Filter index.use to values between 1 and self$shape[MARGIN]
+        index.use <- sort(x = index.use)
+        index.use <- as.integer(x = index.use)
+        index.use <- index.use[index.use >= 1 & index.use <= self$shape[MARGIN]]
+        index.use <- as.vector(x = na.omit(object = index.use))
+        # If we still have values, figure out NAs, otherwise set index.use to NULL
+        if (length(x = index.use) == 0) {
+          warning("No values passed to 'index.use' fall within the data, using all values")
+          index.use <- 1:self$shape[MARGIN]
+        }
       }
       # Create our results holding object
       results <- vector(mode = "list", length = length(x = batch))
@@ -902,30 +923,46 @@ loom <- R6Class(
         pb <- txtProgressBar(char = '=', style = 3)
       }
       for (i in 1:length(x = batch)) {
+        # Get the indices we're iterating over
         chunk.indices <- self$batch.next(return.data = FALSE)
+        indices.use <- chunk.indices[chunk.indices %in% index.use]
+        indices.use <- indices.use - chunk.indices[1] + 1
+        if (length(x = indices.use) < 1) {
+          if (display.progress) {
+            setTxtProgressBar(pb = pb, value = i / length(x = batch))
+          }
+          next
+        }
+        # Get the data and apply FUN
         chunk.data <- if (dataset.matrix) {
           switch(
             EXPR = MARGIN,
-            '1' = self[[dataset.use]][, chunk.indices], # Chunk genes
-            '2' = self[[dataset.use]][chunk.indices, ] # Chunk cells
+            '1' = {
+              # Chunk genes
+              x <- self[[dataset.use]][, chunk.indices]
+              x[, indices.use]
+            },
+            '2' = {
+              # Chunk cells
+              x <- self[[dataset.use]][chunk.indices, ]
+              x[indices.use, ]
+            }
           )
         } else {
-          self[[dataset.use]][chunk.indices]
+          x <- self[[private$iter.datset]][chunk.indices]
+          x[indices.use]
         }
         results[[i]] <- FUN(chunk.data, ...)
         if (display.progress) {
           setTxtProgressBar(pb = pb, value = i / length(x = batch))
         }
       }
-      # Bring result list into vector or matrix format
-      if (class(results[[1]]) == 'numeric') {
-        results <- unlist(x = results, use.names = FALSE)
+      # Bring result list into matrix or vector format
+      if (inherits(x = results[[1]], what = c('matrix', 'Matrix', 'data.frame'))) {
+        reduce.func <- switch(EXPR = MARGIN, '1' = cbind, '2' = rbind)
+        results <- Reduce(f = reduce.func, x = results)
       } else {
-        if (MARGIN == 1) {
-          results <- Reduce(f = cbind, x = results)
-        } else if (MARGIN == 2) {
-          results <- Reduce(f = rbind, x = results)
-        }
+        results <- unlist(x = results, use.names = FALSE)
       }
       if (display.progress) {
         close(con = pb)
@@ -1040,7 +1077,7 @@ loom <- R6Class(
           expr = other.key <- other[['row_attrs']][[other.key]][],
           error = function(e) {
             if (is.character(x = other)) {
-              ofile$close
+              ofile$close_all()
             }
             stop("Failed to find the gene names dataset in the other loom file")
           }
@@ -1049,7 +1086,7 @@ loom <- R6Class(
           expr = self.key <- self[['row_attrs']][[self.key]][],
           error = function(e) {
             if (is.character(x = other)) {
-              ofile$close
+              ofile$close_all()
             }
             stop("Failed to find the gene names dataset in this loom file")
           }
@@ -1257,7 +1294,6 @@ create <- function(
     } else {
       as.matrix(x = data[row.start:row.end, ])
     }
-    # new.loom[['matrix']][row.start:row.end, ] <- as.matrix(x = data[row.start:row.end, ])
     new.loom[['matrix']][row.start:row.end, ] <- data.add
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
