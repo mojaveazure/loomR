@@ -69,6 +69,15 @@ A class for loom files
   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
     Add row or column attributes
   }
+  \item{\code{get.attribute.df}}{
+    Get a group of row or column attributes as a data frame, will only return attributes that have one dimension
+    \describe{
+      \item{\code{attribute.layer}}{Either 'row' or 'col' to get row- or column-attributes}
+      \item{\code{attribute.names}}{A vector of attribute dataset basenames}
+      \item{\code{row.names}}{Basename of the rownames dataset}
+      \item{\code{col.names}}{Basename of the colnames dataset}
+    }
+  }
   \item{\code{get.graph(name, MARGIN)}}{
     Get a graph as a sparse matrix
     \describe{
@@ -87,6 +96,7 @@ A class for loom files
       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
       \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
       \item{\code{force.reset}}{Force a reset of the internal iterator}
+      \item{\code{return.data}}{Return data for a given chunk, if \code{FALSE}, returns the indices across \code{MARGIN} for said chunk}
     }
   }
   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
@@ -113,16 +123,24 @@ A class for loom files
       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
       \item{\code{dataset.use}}{Name of dataset to use}
       \item{\code{display.progress}}{Display progress}
-      \item{\code{expected}}{Class of expected result ('matrix' or 'vector'), defaults to class of \code{dataset.use}}
+      \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
-    Add m2 cells to a loom file.
+    Add cells to a loom file.
     \describe{
-      \item{\code{matrix.data}}{a list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
-      \item{\code{attributes.data}}{a list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
-      \item{\code{layers.data}}{a list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
-      \item{\code{display.progress}}{display progress}
+      \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+      \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
+      \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+      \item{\code{display.progress}}{Display progress}
+    }
+  }
+  \item{\code{add.loom(other, other.key, self.key, ...)}}{
+    \describe{
+      \item{\code{other}}{An object of class \code{loom} or a filename of another loom file}
+      \item{\code{other.key}}{Row attribute in \code{other} to add by}
+      \item{\code{self.key}}{Row attribute in this loom file to add by}
+      \item{\code{...}}{Ignored for now}
     }
   }
 }
