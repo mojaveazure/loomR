@@ -1375,8 +1375,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @param m Rows (cells) to subset, defaults to all rows
 #' @param n Columns (genes) to subset, defaults to all columns
 #' @param filename Filename for new loom object, defaults to ...
-#' @param chunk.m Chunk size for m
-#' @param chunk.n Chunk size for n
+#' @param chunk.size Chunk size to iterate through \code{x}
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress bars?
 #' @param ... Ignored for now
@@ -1395,8 +1394,7 @@ subset.loom <- function(
   m = NULL,
   n = NULL,
   filename = NULL,
-  chunk.m = 1000,
-  chunk.n = 1000,
+  chunk.size = 1000,
   overwrite = FALSE,
   display.progress = TRUE,
   ...
@@ -1450,15 +1448,26 @@ subset.loom <- function(
     dims = matrix.dims
   )
   new.loom$shape <- rev(x = matrix.dims)
-  batch <- new.loom$batch.scan(chunk.size = chunk.m)
+  batch <- x$batch.scan(chunk.size = chunk.size)
   if (display.progress) {
     catn("Adding data for /matrix")
     pb <- new.pb()
   }
   for (i in 1:length(x = batch)) {
-    these.indices <- new.loom$batch.next(return.data = FALSE)
-    chunk.indices <- m[these.indices]
-    new.loom[['matrix']][these.indices, ] <- x[['matrix']][chunk.indices, n]
+    chunk.indices <- x$batch.next(return.data = FALSE)
+    indices.use <- chunk.indices[chunk.indices %in% m]
+    if (length(x = indices.use) < 1) {
+      if (display.progress) {
+        setTxtProgressBar(pb = pb, value = i / length(x = batch))
+      }
+      next
+    }
+    indices.return <- match(x = indices.use, table = m)
+    indices.use <- indices.use - chunk.indices[1] + 1
+    chunk.data <- x[['matrix']][chunk.indices, ]
+    chunk.data <- chunk.data[indices.use, n]
+    new.loom[['matrix']][indices.return, ] <- chunk.data
+    gc(verbose = FALSE)
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = i / length(x = batch))
     }
@@ -1479,11 +1488,18 @@ subset.loom <- function(
       counter <- 0
     }
     for (row.attr in row.attrs) {
-      if (length(x = x[[row.attr]]$dims) == 2) {
-        new.loom[[row.attr]] <- x[[row.attr]][, n]
+      if (n.all) {
+        new.loom[['row_attrs']]$obj_copy_from(
+          src_loc = x,
+          src_name = row.attr,
+          dst_name = basename(path = row.attr)
+        )
+      } else if (length(x = x[[row.attr]]$dims) == 2) {
+        new.loom[[row.attr]] <- x[[row.attr]][,][, n]
       } else {
-        new.loom[[row.attr]] <- x[[row.attr]][n]
+        new.loom[[row.attr]] <- x[[row.attr]][][n]
       }
+      gc(verbose = FALSE)
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = row.attrs))
@@ -1504,11 +1520,18 @@ subset.loom <- function(
       counter <- 0
     }
     for (col.attr in col.attrs) {
-      if (length(x = x[[col.attr]]$dims) == 2) {
+      if (m.all) {
+        new.loom[['col_attrs']]$obj_copy_from(
+          src_loc = x,
+          src_name = col.attr,
+          dst_name = basename(path = col.attr)
+        )
+      } else if (length(x = x[[col.attr]]$dims) == 2) {
         new.loom[[col.attr]] <- x[[col.attr]][, m]
       } else {
         new.loom[[col.attr]] <- x[[col.attr]][m]
       }
+      gc(verbose = FALSE)
       if (display.progress) {
         counter <- counter + 1
         setTxtProgressBar(pb = pb, value = counter / length(x = col.attrs))
@@ -1535,14 +1558,24 @@ subset.loom <- function(
         dims = matrix.dims
       )
     }
-    # Start adding in batches
-    batch <- new.loom$batch.scan(chunk.size = chunk.m)
+    batch <- x$batch.scan(chunk.size = chunk.size)
     for (i in 1:length(x = batch)) {
-      these.indices <- new.loom$batch.next(return.data = FALSE)
-      chunk.indices <- m[these.indices]
-      # Add the data for each loom for this batch
+      chunk.indices <- x$batch.next(return.data = FALSE)
+      indices.use <- chunk.indices[chunk.indices %in% m]
+      if (length(x = indices.use) < 1) {
+        if (display.progress) {
+          setTxtProgressBar(pb = pb, value = i / length(x = batch))
+        }
+        next
+      }
+      indices.return <- match(x = indices.use, table = m)
+      indices.use <- indices.use - chunk.indices[1] + 1
+      # Add the data for each layer for this batch
       for (layer in layers) {
-        new.loom[[layer]][these.indices, ] <- x[[layer]][chunk.indices, n]
+        layer.data <- x[[layer]][chunk.indices, ]
+        layer.data <- layer.data[indices.use, n]
+        new.loom[[layer]][indices.return, ] <- layer.data
+        gc(verbose = FALSE)
       }
       if (display.progress) {
         setTxtProgressBar(pb = pb, value = i / length(x = batch))

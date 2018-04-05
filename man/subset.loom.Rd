@@ -6,8 +6,7 @@
 \title{Subset a loom file}
 \usage{
 \method{subset}{loom}(x, m = NULL, n = NULL, filename = NULL,
-  chunk.m = 1000, chunk.n = 1000, overwrite = FALSE,
-  display.progress = TRUE, ...)
+  chunk.size = 1000, overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
 \item{x}{A loom object}
@@ -18,9 +17,7 @@
 
 \item{filename}{Filename for new loom object, defaults to ...}
 
-\item{chunk.m}{Chunk size for m}
-
-\item{chunk.n}{Chunk size for n}
+\item{chunk.size}{Chunk size to iterate through \code{x}}
 
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
