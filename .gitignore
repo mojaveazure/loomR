@@ -4,6 +4,7 @@
 .Rhistory
 .RData
 *.Rda
+*.Rds
 .Ruserdata
 
 # Ignore system files and directories
