@@ -1673,6 +1673,7 @@ combine <- function(
       ))
     }
   }
+
   # Set mode and provide more useful error
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
   if (file.exists(filename) && !overwrite) {
@@ -1850,6 +1851,8 @@ combine <- function(
     new.loom$create_group(name = group)
   }
   # Initialize the '/matrix' dataset as well as datasets in 'col_attrs' and 'layers'
+  col.attrs <- unlist(col.attrs)
+  row.attrs <- unlist(row.attrs)
   new.loom$create_dataset(
     name = 'matrix', # Name is '/matrix'
     dtype = getDtype2(x = matrix.type), # Use the single type that we got from above
@@ -1882,7 +1885,7 @@ combine <- function(
   # Start adding loom objects
   matrix.previous <- 0
   col.previous <- vector(mode = 'integer', length = length(x = col.attrs))
-  names(x = col.previous) <- unlist(x = col.attrs)
+  names(x = col.previous) <- col.attrs
   for (i in 1:length(x = looms)) {
     if (display.progress) {
       catn("\nAdding loom file", i ,"of", length(x = looms))
@@ -1944,10 +1947,10 @@ combine <- function(
       if (display.progress) {
         setTxtProgressBar(
           pb = pb,
-          value = grep(
+          value = (grep(
             pattern = attr,
             x = list.datasets(object = this[['col_attrs']], full.names = TRUE)
-          ) / length(x = list.datasets(object = this[['col_attrs']], full.names = TRUE))
+          ) / length(x = list.datasets(object = this[['col_attrs']], full.names = TRUE)))[1]
         )
       }
     }
