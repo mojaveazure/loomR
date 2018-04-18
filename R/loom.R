@@ -1108,6 +1108,37 @@ loom <- R6Class(
       if (is.character(x = other)) {
         ofile$close_all()
       }
+    },
+    # Datetime functions
+    timestamp = function(dataset) {
+      if (self$mode == 'r') {
+        stop(private$err_mode)
+      }
+      # Timestamp format, always in UTC
+      # %Y -- four-digit year
+      # %m -- two-digit month
+      # %d -- two-digit day
+      # T -- sepearte date from time
+      # %H -- 24-hour time
+      # %M -- two-digit minute
+      # %OS6 -- seconds with 6 digits after the decimal
+      # Z -- end time
+      time <- strftime(x = Sys.time(), format = '%Y%m%dT%H%M%OS6Z', tz = 'UTC')
+      h5attr(x = self[[dataset]], which = 'last_modified') <- time
+      invisible(x = self)
+    },
+    last.modified = function(...) {
+      time <- unlist(x = strsplit(x = '', split = '.', fixed = TRUE))[1]
+      if (substr(x = time, start = nchar(x = time), stop = nchar(x = time)) != 'Z') {
+        time <- paste0(time, 'Z')
+      }
+      time <- as.POSIXct(x = strptime(
+        x = time,
+        format = '%Y%m%dT%H%M%SZ',
+        tz = 'UTC'
+      ))
+      time <- format(x = time, tz = Sys.timezone(), usetz = TRUE)
+      return(time)
     }
   ),
   # Private fields and methods
@@ -1594,8 +1625,8 @@ subset.loom <- function(
 
 #' Combine loom files
 #'
-#' @param looms A vector of loom files or filenames
-#' @param filename Name for resultant vector
+#' @param looms A list of loom files or filenames
+#' @param filename Name for resultant loom file
 #' @param chunk.size How many rows form each input loom should we stream to the merged loom file at any given time?
 #' @param order.by Optional row attribute to order each input loom by, must be one dimensional
 #' @param overwrite Overwrite \code{filename} if already exists?
@@ -1618,6 +1649,9 @@ combine <- function(
   display.progress = TRUE,
   ...
 ) {
+  if (!is.list(x = looms)) {
+    stop("'combine' takes a list of loom objects or paths to loom files")
+  }
   # Basic checking of input arguments
   looms <- looms[vapply(
     X = looms,
@@ -1663,10 +1697,10 @@ combine <- function(
     pb <- new.pb()
   }
   for (i in 1:length(x = looms)) {
-    this <- if (is.character(x = looms[i])) {
-      connect(filename = looms[i])
+    this <- if (is.character(x = looms[[i]])) {
+      connect(filename = looms[[i]])
     } else {
-      looms[i]
+      looms[[i]]
     }
     row.attrs[[i]] <- sort(x = list.datasets(
       object = this,
@@ -1715,7 +1749,7 @@ combine <- function(
     nrows[[i]] <- this[['matrix']]$dims[2]
     ncols[[i]] <- this[['matrix']]$dims[1]
     matrix.type[[i]] <- class(x = this[['matrix']]$get_type())[1]
-    if (is.character(x = looms[i])) {
+    if (is.character(x = looms[[i]])) {
       this$close_all()
     }
     if (display.progress) {
@@ -1854,10 +1888,10 @@ combine <- function(
       catn("\nAdding loom file", i ,"of", length(x = looms))
     }
     # Open the loom file
-    this <- if (is.character(x = looms[i])) {
-      connect(filename = looms[i])
+    this <- if (is.character(x = looms[[i]])) {
+      connect(filename = looms[[i]])
     } else {
-      looms[i]
+      looms[[i]]
     }
     # Get the chunk points
     chunk.points <- chunkPoints(data.size = ncols[[i]], chunk.size = chunk.size)
@@ -1942,7 +1976,7 @@ combine <- function(
     }
     new.loom$flush()
     # Close current loom file, if not open previously
-    if (is.character(x = looms[i])) {
+    if (is.character(x = looms[[i]])) {
       this$close_all()
     }
   }

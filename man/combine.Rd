@@ -8,9 +8,9 @@ combine(looms, filename, chunk.size = 1000, order.by = NULL,
   overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
-\item{looms}{A vector of loom files or filenames}
+\item{looms}{A list of loom files or filenames}
 
-\item{filename}{Name for resultant vector}
+\item{filename}{Name for resultant loom file}
 
 \item{chunk.size}{How many rows form each input loom should we stream to the merged loom file at any given time?}
 
