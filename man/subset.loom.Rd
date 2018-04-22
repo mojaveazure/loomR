@@ -31,3 +31,6 @@ A loom object connected to \code{filename}
 \description{
 Subset a loom file
 }
+\seealso{
+\code{\link{loom}}
+}

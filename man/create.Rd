@@ -36,5 +36,5 @@ A connection to a loom file
 Create a loom object
 }
 \seealso{
-\code{\link{loom-class}}
+\code{\link{loom}}
 }

@@ -8,11 +8,11 @@ combine(looms, filename, chunk.size = 1000, order.by = NULL,
   overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
-\item{looms}{A list of loom files or filenames}
+\item{looms}{A list of \code{loom} objects or paths to loom files}
 
 \item{filename}{Name for resultant loom file}
 
-\item{chunk.size}{How many rows form each input loom should we stream to the merged loom file at any given time?}
+\item{chunk.size}{How many rows from each input loom should we stream to the merged loom file at any given time?}
 
 \item{order.by}{Optional row attribute to order each input loom by, must be one dimensional}
 
@@ -27,5 +27,5 @@ A loom object connected to \code{filename}
 Combine loom files
 }
 \seealso{
-\code{\link{loom-class}}
+\code{\link{loom}}
 }

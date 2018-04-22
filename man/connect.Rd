@@ -21,5 +21,5 @@ A loom file connection
 Connect to a loom file
 }
 \seealso{
-\code{\link{loom-class}}
+\code{\link{loom}}
 }

@@ -4,15 +4,16 @@
 #' @importFrom R6 R6Class
 NULL
 
-#' A class for loom files
+#' A class for connections loom files
+#'
 #'
 #' @docType class
-#' @name loom-class
-#' @rdname loom-class
-#' @aliases loom
-#' @return Object of \code{\link{R6::R6Class}} to generate \code{loom} objects
+#' @name loom
+#' @rdname loom
+#' @usage lfile <- loomR::connect(filename = 'myfile.loom')
+#' @aliases loom-class
 #' @format An \code{\link{R6::R6Class}} object
-#' @seealso \code{\link{hdf5r::H5File}}
+#' @seealso \code{\link{loomR}}, \code{\link{hdf5r::H5File}}
 #'
 #' @field version Version of loomR object was created under
 #' @field shape Shape of \code{/matrix} in genes (columns) by cells (rows)
@@ -1270,7 +1271,7 @@ loom <- R6Class(
 #'
 #' @importFrom utils packageVersion txtProgressBar setTxtProgressBar
 #'
-#' @seealso \code{\link{loom-class}}
+#' @seealso \code{\link{loom}}
 #'
 #' @export
 #'
@@ -1407,7 +1408,7 @@ create <- function(
 #'
 #' @return A loom file connection
 #'
-#' @seealso \code{\link{loom-class}}
+#' @seealso \code{\link{loom}}
 #'
 #' @export
 #'
@@ -1435,6 +1436,8 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @aliases subset
 #'
 #' @importFrom utils setTxtProgressBar
+#'
+#' @seealso \code{\link{loom}}
 #'
 #' @export subset.loom
 #' @method subset loom
@@ -1678,9 +1681,9 @@ subset.loom <- function(
 
 #' Combine loom files
 #'
-#' @param looms A list of loom files or filenames
+#' @param looms A list of \code{loom} objects or paths to loom files
 #' @param filename Name for resultant loom file
-#' @param chunk.size How many rows form each input loom should we stream to the merged loom file at any given time?
+#' @param chunk.size How many rows from each input loom should we stream to the merged loom file at any given time?
 #' @param order.by Optional row attribute to order each input loom by, must be one dimensional
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress as we're copying over data
@@ -1689,7 +1692,7 @@ subset.loom <- function(
 #'
 #' @importFrom utils setTxtProgressBar
 #'
-#' @seealso \code{\link{loom-class}}
+#' @seealso \code{\link{loom}}
 #'
 #' @export
 #'
