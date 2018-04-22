@@ -6,7 +6,8 @@
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
   layers = NULL, chunk.dims = "auto", chunk.size = 1000,
-  do.transpose = TRUE, overwrite = FALSE, display.progress = TRUE)
+  do.transpose = TRUE, calc.numi = FALSE, overwrite = FALSE,
+  display.progress = TRUE)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
@@ -22,6 +23,9 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 \item{chunk.size}{How many rows of \code{data} should we stream to the loom file at any given time?}
 
 \item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns}
+
+\item{calc.numi}{Calculate number of UMIs and genes expressed per cell? Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
+To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)}
 
 \item{overwrite}{Overwrite an already existing loom file?}
 }

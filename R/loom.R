@@ -57,10 +57,10 @@ NULL
 #'   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
 #'     Add row or column attributes
 #'   }
-#'   \item{\code{get.attribute.df}}{
+#'   \item{\code{get.attribute.df(MARGIN, attribute.names, row.names, col.names)}}{
 #'     Get a group of row or column attributes as a data frame, will only return attributes that have one dimension
 #'     \describe{
-#'       \item{\code{attribute.layer}}{Either 'row' or 'col' to get row- or column-attributes}
+#'       \item{\code{MARGIN}}{Either '1' or '2' to get row- or column-attributes, respectively}
 #'       \item{\code{attribute.names}}{A vector of attribute dataset basenames}
 #'       \item{\code{row.names}}{Basename of the rownames dataset}
 #'       \item{\code{col.names}}{Basename of the colnames dataset}
@@ -103,7 +103,6 @@ NULL
 #'   }
 #'   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
 #'     Map a function onto a dataset within the loom file, returns the result into R.
-#'     The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
 #'     \describe{
 #'       \item{\code{FUN}}{}
 #'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
@@ -124,6 +123,7 @@ NULL
 #'     }
 #'   }
 #'   \item{\code{add.loom(other, other.key, self.key, ...)}}{
+#'     Add the contents of another loom file to this one.
 #'     \describe{
 #'       \item{\code{other}}{An object of class \code{loom} or a filename of another loom file}
 #'       \item{\code{other.key}}{Row attribute in \code{other} to add by}
@@ -492,7 +492,7 @@ loom <- R6Class(
     },
     # Get attribute information
     get.attribute.df = function(
-      attribute.layer = c("row", "col"),
+      MARGIN = 2,
       attribute.names = NULL,
       row.names = "gene_names",
       col.names = "cell_names"
@@ -504,9 +504,15 @@ loom <- R6Class(
       # attribute.names name of rows or columns to combine into matrix
       # row.names either a character vector or name of an element in row_attrs
       # col.names either a character vector or name of an element in col_attrs
-      if (!attribute.layer %in% c("row", "col")) {
-        stop("Invalid attribute.layer. Please select either 'row' or 'col'.")
-      }
+      # if (!attribute.layer %in% c("row", "col")) {
+      #   stop("Invalid attribute.layer. Please select either 'row' or 'col'.")
+      # }
+      attribute.layer <- switch(
+        EXPR = MARGIN,
+        '1' = 'row',
+        '2' = 'col',
+        stop("'MARGIN' must be either '1' for row attributes or '2' for column attributes")
+      )
       attribute.layer <- paste0(attribute.layer, "_attrs")
       # by default return all attributes
       if (is.null(attribute.names)) {
@@ -1255,6 +1261,8 @@ loom <- R6Class(
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
 #' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns
+#' @param calc.numi Calculate number of UMIs and genes expressed per cell? Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
+#' To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)
 #' @param chunk.size How many rows of \code{data} should we stream to the loom file at any given time?
 #' @param overwrite Overwrite an already existing loom file?
 #'
@@ -1275,6 +1283,7 @@ create <- function(
   chunk.dims = 'auto',
   chunk.size = 1000,
   do.transpose = TRUE,
+  calc.numi = FALSE,
   overwrite = FALSE,
   display.progress = TRUE
 ) {
@@ -1368,6 +1377,16 @@ create <- function(
   }
   if (!is.null(x = cell.attrs)) {
     new.loom$add.col.attribute(attribute = cell.attrs)
+  }
+  # Calculate nUMI and nGene if asked
+  if (calc.numi) {
+    is.expr <- ifelse(test = is.numeric(x = calc.numi), yes = calc.numi, no = 0)
+    calc.umi(
+      object = new.loom,
+      chunk.size = chunk.size,
+      display.progress = display.progress,
+      is.expr = is.expr
+    )
   }
   # Set last bit of information
   chunks <- new.loom[['matrix']]$chunk_dims
@@ -1479,26 +1498,64 @@ subset.loom <- function(
     dims = matrix.dims
   )
   new.loom$shape <- rev(x = matrix.dims)
-  batch <- x$batch.scan(chunk.size = chunk.size)
+  batch <- break.consecutive(
+    x = m,
+    max.length = chunk.size,
+    min.length = chunk.size * 0.5
+  )
+  previous <- 1L
+  layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
   if (display.progress) {
-    catn("Adding data for /matrix")
+    msg <- "Adding data for /matrix"
+    num.layers <- length(x = layers)
+    if (num.layers) {
+      msg <- paste(msg, 'and', num.layers, 'layers')
+    }
+    catn(msg)
+    if (!num.layers) {
+      cate("No layers found")
+    }
     pb <- new.pb()
   }
-  for (i in 1:length(x = batch)) {
-    chunk.indices <- x$batch.next(return.data = FALSE)
-    indices.use <- chunk.indices[chunk.indices %in% m]
-    if (length(x = indices.use) < 1) {
-      if (display.progress) {
-        setTxtProgressBar(pb = pb, value = i / length(x = batch))
-      }
-      next
+  if (length(x = layers) > 0) {
+    for (layer in layers) {
+      new.loom[['layers']]$create_dataset(
+        name = basename(path = layer),
+        dtype = getDtype2(x = class(x = x[[layer]]$get_type())[1]),
+        dims = matrix.dims
+      )
     }
-    indices.return <- match(x = indices.use, table = m)
-    indices.use <- indices.use - chunk.indices[1] + 1
+  }
+  for (i in 1:length(x = batch)) {
+    indices.use <- batch[[i]]
+    chunk.indices <- min(indices.use):max(indices.use)
+    indices.return <- previous:(previous + length(x = indices.use) - 1)
+    indices.use <- chunk.indices[chunk.indices %in% indices.use] - chunk.indices[1] + 1
+    previous <- max(indices.return) + 1L
+    # chunk.indices <- x$batch.next(return.data = FALSE)
+    # indices.use <- chunk.indices[chunk.indices %in% m]
+    # if (length(x = indices.use) < 1) {
+    #   if (display.progress) {
+    #     setTxtProgressBar(pb = pb, value = i / length(x = batch))
+    #   }
+    #   next
+    # }
+    # indices.return <- match(x = indices.use, table = m)
+    # indices.use <- indices.use - chunk.indices[1] + 1
     chunk.data <- x[['matrix']][chunk.indices, ]
+    chunk.data <- matrix(data = chunk.data, nrow = length(x = chunk.indices))
     chunk.data <- chunk.data[indices.use, n]
+    # chunk.data <- chunk.data[indices.use, n]
     new.loom[['matrix']][indices.return, ] <- chunk.data
     gc(verbose = FALSE)
+    if (length(x = layers) > 0) {
+      for (layer in layers) {
+        layer.data <- x[[layer]][chunk.indices, ]
+        layer.data <- layer.data[indices.use, n]
+        new.loom[[layer]][indices.return, ] <- layer.data
+        gc(verbose = FALSE)
+      }
+    }
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = i / length(x = batch))
     }
@@ -1574,50 +1631,46 @@ subset.loom <- function(
   } else {
     cate("No column attributes found")
   }
-  # Add layers
-  layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
-  if (length(x = layers) > 0) {
-    if (display.progress) {
-      catn("Adding", length(x = layers), "layers")
-      pb <- new.pb()
-    }
-    # Initialize datasets
-    for (layer in layers) {
-      new.loom[['layers']]$create_dataset(
-        name = basename(path = layer),
-        dtype = getDtype2(x = class(x = x[[layer]]$get_type())[1]),
-        dims = matrix.dims
-      )
-    }
-    batch <- x$batch.scan(chunk.size = chunk.size)
-    for (i in 1:length(x = batch)) {
-      chunk.indices <- x$batch.next(return.data = FALSE)
-      indices.use <- chunk.indices[chunk.indices %in% m]
-      if (length(x = indices.use) < 1) {
-        if (display.progress) {
-          setTxtProgressBar(pb = pb, value = i / length(x = batch))
-        }
-        next
-      }
-      indices.return <- match(x = indices.use, table = m)
-      indices.use <- indices.use - chunk.indices[1] + 1
-      # Add the data for each layer for this batch
-      for (layer in layers) {
-        layer.data <- x[[layer]][chunk.indices, ]
-        layer.data <- layer.data[indices.use, n]
-        new.loom[[layer]][indices.return, ] <- layer.data
-        gc(verbose = FALSE)
-      }
-      if (display.progress) {
-        setTxtProgressBar(pb = pb, value = i / length(x = batch))
-      }
-    }
-    if (display.progress) {
-      close(con = pb)
-    }
-  } else {
-    cate("No layers found")
-  }
+  # # Add layers
+  # layers <- list.datasets(object = x, path = 'layers', full.names = TRUE)
+  # if (length(x = layers) > 0) {
+  #   if (display.progress) {
+  #     catn("Adding", length(x = layers), "layers")
+  #     pb <- new.pb()
+  #   }
+  #   # Initialize datasets
+  #   for (layer in layers) {
+  #     new.loom[['layers']]$create_dataset(
+  #       name = basename(path = layer),
+  #       dtype = getDtype2(x = class(x = x[[layer]]$get_type())[1]),
+  #       dims = matrix.dims
+  #     )
+  #   }
+  #   # batch <- x$batch.scan(chunk.size = chunk.size)
+  #   for (i in 1:length(x = batch)) {
+  #     # chunk.indices <- x$batch.next(return.data = FALSE)
+  #     indices.use <- batch[[i]]
+  #     chunk.indices <- min(indices.use):max(indices.use)
+  #     indices.use <- chunk.indices[chunk.indices %in% m]
+  #     indices.return <- match(x = indices.use, table = m)
+  #     indices.use <- indices.use - chunk.indices[1] + 1
+  #     # Add the data for each layer for this batch
+  #     for (layer in layers) {
+  #       layer.data <- x[[layer]][chunk.indices, ]
+  #       layer.data <- layer.data[indices.use, n]
+  #       new.loom[[layer]][indices.return, ] <- layer.data
+  #       gc(verbose = FALSE)
+  #     }
+  #     if (display.progress) {
+  #       setTxtProgressBar(pb = pb, value = i / length(x = batch))
+  #     }
+  #   }
+  #   if (display.progress) {
+  #     close(con = pb)
+  #   }
+  # } else {
+  #   cate("No layers found")
+  # }
   new.loom$flush()
   new.loom$load.fields()
   return(new.loom)

@@ -456,6 +456,99 @@ new.pb <- function() {
   return(txtProgressBar(style = 3, char = '='))
 }
 
+# Break a vector into a list of consecutive values
+#
+# @param x An integer vector
+# @param max.length Maximum length of consecutive values;
+# set to NULL if no maximum is desired
+#
+# @return A list where each value is a run of consecutive values from x
+#
+#' @importFrom stats na.omit
+#
+break.consecutive <- function(x, max.length = NULL, min.length = NULL) {
+  # Coerce x to integers, find unique values, sort it
+  x <- sort(x = unique(x = na.omit(object = as.integer(x = x))))
+  if (is.null(x = max.length)) {
+    max.length <- length(x = x)
+  }
+  if (is.null(x = min.length)) {
+    min.length <- 1L
+  }
+  # Functions to allocate a vector and increment a counter
+  alloc <- function() {return(vector(mode = 'integer', length = max.length))}
+  inc <- function(x) {return(x + 1L)}
+  # Results list, counters, and holding vector, all preallocated for speed
+  consecutive <- vector(mode = 'list', length = length(x = x))
+  index <- 1L
+  counter <- 0L
+  run <- alloc()
+  # For every value in x, if it's consecutive, add it to the holding vector
+  # Otherwise, add the run to the list of consecutive values
+  for (i in x) {
+    if (counter == max.length || (counter != 0L && counter >= min.length && i != run[counter] + 1L)) {
+      consecutive[[index]] <- run[1:counter]
+      index <- inc(x = index)
+      run <- alloc()
+      counter <- 0L
+    }
+    counter <- inc(x = counter)
+    run[counter] <- i
+  }
+  consecutive[[index]] <- run[1:counter]
+  consecutive <- consecutive[1:index]
+  return(consecutive)
+}
+
+# Calculate nUMI and nGene
+#
+# @param object An object
+# @param chunk.size Number of cells to chunk over
+# @param is.expr Expression threshold for 'detected' gene. For most datasets, particularly UMI datasets, will be set to 0 (default).
+# If not, when initializing, this should be set to a level based on pre-normalized counts (i.e. require at least 5 counts to be treated as expresesd).
+# @param display.progres Display a progress bar?
+#
+# @return Stores nUMI in \code{col_attrs/nUMI}; stores nGene in \code{col_attrs/nGene}; will overwrite any existing datasets at these locations
+#
+#' @importFrom Matrix rowSums
+#
+calc.umi <- function(
+  object,
+  chunk.size = 1000,
+  is.expr = 0,
+  display.progress = TRUE
+) {
+  if (display.progress) {
+    cate("Calculating number of UMIs per cell")
+  }
+  object$apply(
+    name = 'col_attrs/nUMI',
+    FUN = rowSums,
+    MARGIN = 2,
+    chunk.size = chunk.size,
+    dataset.use = 'matrix',
+    overwrite = TRUE,
+    display.progress = display.progress
+  )
+  if (display.progress) {
+    cate("Calculating number of genes expressed per cell")
+    cate("Using a threshold of", is.expr, "for gene expression")
+  }
+  object$apply(
+    name = 'col_attrs/nGene',
+    FUN = function(mat, is.expr) {
+      return(rowSums(x = mat > is.expr))
+    },
+    MARGIN = 2,
+    chunk.size = chunk.size,
+    dataset.use = 'matrix',
+    overwrite = TRUE,
+    display.progress = display.progress,
+    is.expr = is.expr
+  )
+  invisible(x = object)
+}
+
 # Cat with a new line
 #
 # @param ... Text to be output
