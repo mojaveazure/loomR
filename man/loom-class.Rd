@@ -69,10 +69,10 @@ A class for loom files
   \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
     Add row or column attributes
   }
-  \item{\code{get.attribute.df}}{
+  \item{\code{get.attribute.df(MARGIN, attribute.names, row.names, col.names)}}{
     Get a group of row or column attributes as a data frame, will only return attributes that have one dimension
     \describe{
-      \item{\code{attribute.layer}}{Either 'row' or 'col' to get row- or column-attributes}
+      \item{\code{MARGIN}}{Either '1' or '2' to get row- or column-attributes, respectively}
       \item{\code{attribute.names}}{A vector of attribute dataset basenames}
       \item{\code{row.names}}{Basename of the rownames dataset}
       \item{\code{col.names}}{Basename of the colnames dataset}
@@ -115,7 +115,6 @@ A class for loom files
   }
   \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
     Map a function onto a dataset within the loom file, returns the result into R.
-    The result will default to the shape of the dataset used; to change pass either 'vector' or 'matrix' to \code{expected}.
     \describe{
       \item{\code{FUN}}{}
       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
@@ -136,6 +135,7 @@ A class for loom files
     }
   }
   \item{\code{add.loom(other, other.key, self.key, ...)}}{
+    Add the contents of another loom file to this one.
     \describe{
       \item{\code{other}}{An object of class \code{loom} or a filename of another loom file}
       \item{\code{other.key}}{Row attribute in \code{other} to add by}
