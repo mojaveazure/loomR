@@ -91,7 +91,7 @@ NULL
 #'   \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
 #'     Apply a function over a dataset within the loom file, stores the results in the loom file. Will not make multidimensional attributes.
 #'     \describe{
-#'       \item{\code{name}}{Full name ('group/name')of dataset to store results to}
+#'       \item{\code{name}}{Full name ('group/name') of dataset to store results to}
 #'       \item{\code{FUN}}{Function to apply}
 #'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
 #'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
