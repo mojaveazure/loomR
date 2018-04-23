@@ -1,5 +1,5 @@
 <!--
-[![CRAN Version](https://www.r-pkg.org/badges/version/loomR)](https://cran.r-project.org/package=loomR) 
+[![CRAN Version](https://www.r-pkg.org/badges/version/loomR)](https://cran.r-project.org/package=loomR)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/loomR)](https://cran.r-project.org/package=loomR)
 -->
 
@@ -19,8 +19,13 @@ loomR aims to be completely compatible with loompy. Currently, loomR implements 
  - map/apply
  - create
  - connect
+ - combine
+ - subset
  - add layer
  - add attriute
+ - add graph
+ - add cells
+ - add loom
 
 ## Dependencies
 
