@@ -2,7 +2,7 @@ Package: loomR
 Type: Package
 Title: An R interface for loom files
 Version: 0.2.0
-Date: 2018-23-18
+Date: 2018-04-23
 Authors@R: c(
   person(given = 'Paul', family = 'Hoffman', email = 'phoffman@nygenome.org', role = c('aut', 'cre')),
   person(given = 'Rahul', family = 'Satija', email = 'rsatija@nygenome.org', role = c('aut')),
