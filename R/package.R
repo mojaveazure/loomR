@@ -157,7 +157,6 @@ NULL
 #'
 NULL
 
-
 # Hooks to set loom as an S4 class upon
 # loadNamespace or library/require
 .onLoad <- function(libname, pkgname) {

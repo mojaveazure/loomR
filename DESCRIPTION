@@ -25,9 +25,9 @@ Imports:
 Suggests:
   Seurat
 Collate:
-    'internal.R'
-    'loom.R'
-    'package.R'
+  'internal.R'
+  'loom.R'
+  'package.R'
 License: GPL-3
 Encoding: UTF-8
 LazyData: true

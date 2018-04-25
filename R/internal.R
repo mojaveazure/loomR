@@ -18,7 +18,6 @@ chunkPoints <- function(data.size, chunk.size) {
   ))
 }
 
-
 # Convert sparse matrix pointers to column indicies
 #
 # A function to get the column (j) indices of a sparse matrix from the pointers (p)
@@ -26,6 +25,7 @@ chunkPoints <- function(data.size, chunk.size) {
 # @param p A vector of sparse matrix pointers
 #
 # @return A vector of column (j) indices
+# @author Josh O'Brien
 #
 # @examples
 # dat <- c(0, 0, 1, 4, 0, 2, 0, 9, 0)
