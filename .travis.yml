@@ -1,0 +1,20 @@
+# Set up TravisCI
+language: r
+sudo: required
+warnings_are_errors: false
+dist: trusty
+os:
+  - linux
+  - osx
+# Versions of R to test against
+r:
+  - release
+  - devel
+# Install packages from APT/Homnebrew
+apt_packages:
+  libhdf5-dev
+brew_packages:
+  hdf5
+# Install packages from GitHub
+r_github_packages:
+  hhoeflin/hdf5r
