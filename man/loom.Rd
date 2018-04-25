@@ -7,7 +7,7 @@
 \title{A class for connections loom files}
 \format{An \code{\link{R6::R6Class}} object}
 \usage{
-lfile <- loomR::connect(filename = 'myfile.loom')
+loom
 }
 \description{
 A class for connections loom files

@@ -18,6 +18,8 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 
 \item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}}
 
+\item{layers}{A named list of matrices to be added as layers}
+
 \item{chunk.dims}{A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize}
 
 \item{chunk.size}{How many rows of \code{data} should we stream to the loom file at any given time?}
@@ -28,6 +30,8 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)}
 
 \item{overwrite}{Overwrite an already existing loom file?}
+
+\item{display.progress}{Display a progress bar}
 }
 \value{
 A connection to a loom file
