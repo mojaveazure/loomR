@@ -22,8 +22,6 @@ Imports:
   utils,
   Matrix,
   methods
-Suggests:
-  Seurat
 Collate:
   'internal.R'
   'loom.R'
