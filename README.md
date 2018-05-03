@@ -1,7 +1,7 @@
-<!--
-[![CRAN Version](https://www.r-pkg.org/badges/version/loomR)](https://cran.r-project.org/package=loomR)
-[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/loomR)](https://cran.r-project.org/package=loomR)
--->
+![Travis](https://img.shields.io/travis/mojaveazure/loomR.svg?style=for-the-badge)
+<!-- ![AppVeyor](https://img.shields.io/appveyor/ci/mojaveazure/loomR.svg?style=for-the-badge) -->
+[![forthebadge](https://forthebadge.com/images/badges/gluten-free.svg)](https://forthebadge.com)
+<!-- ![CRAN](https://img.shields.io/cran/v/loomR.svg?style=for-the-badge) -->
 
 # loomR
 
