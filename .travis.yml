@@ -6,6 +6,16 @@ dist: trusty
 os:
   - linux
   - osx
+# Versions of R to test against
+r:
+  - release
+  - devel
+# Travis doesn't work for macOS and r-devel
+matrix:
+  exclude:
+    - os: osx
+      r: devel
+# Global environement variables
 env:
   global:
     - PKG_CFLAGS="-pedantic"
@@ -14,10 +24,6 @@ env:
     - HDF5_RELEASE_URL="https://support.hdfgroup.org/ftp/HDF5/releases"
     - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
     - HDF5_VERSION=1.8.17
-# Versions of R to test against
-r:
-  - release
-  - devel
 # Install packages from APT/Homebrew
 apt_packages:
   - autoconf

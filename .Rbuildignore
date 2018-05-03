@@ -10,3 +10,4 @@
 # Ignore VCS and CI stuff
 ^\.git$
 ^\.travis\.yml$
+^travis_setup.sh$
