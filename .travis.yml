@@ -6,15 +6,31 @@ dist: trusty
 os:
   - linux
   - osx
+env:
+  global:
+    - PKG_CFLAGS="-pedantic"
+    - _R_CHECK_CRAN_INCOMING_=FALSE
+    - ASAN="-fsanitize=address -fno-omit-frame-pointer"
+    - HDF5_RELEASE_URL="https://support.hdfgroup.org/ftp/HDF5/releases"
+    - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+    - HDF5_VERSION=1.8.17
 # Versions of R to test against
 r:
   - release
   - devel
 # Install packages from APT/Homnebrew
 apt_packages:
-  libhdf5-dev
+  - autoconf
+  - build-essential
+  - libtool
+  - libmagick++-dev
+  # - libhdf5-dev
 brew_packages:
-  hdf5
+  - hdf5
 # Install packages from GitHub
 r_github_packages:
-  hhoeflin/hdf5r
+  - hhoeflin/hdf5r
+# Run installation script
+before_install:
+  - chmod +x travis_setup.sh
+  - ./travis_setup.sh
