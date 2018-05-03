@@ -1,4 +1,8 @@
 Package: loomR
 Version: 0.2.0
+Depends: R (>= 3.2.2), R6, hdf5r, iterators, itertools
+Imports: utils, Matrix, methods
+Suggests: Seurat
+License: GPL-3
 MD5sum: 9cffb0c9de2afd44f3d156f6b0b06fd2
 NeedsCompilation: no
