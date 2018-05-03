@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo piefail
+set -eo piepfail
 
 if [ "${TRAVIS_OS_NAME}" != 'osx' ]; then
     cd ..

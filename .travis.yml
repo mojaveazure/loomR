@@ -18,7 +18,7 @@ env:
 r:
   - release
   - devel
-# Install packages from APT/Homnebrew
+# Install packages from APT/Homebrew
 apt_packages:
   - autoconf
   - build-essential
