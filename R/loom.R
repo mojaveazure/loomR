@@ -1440,7 +1440,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #'
 #' @seealso \code{\link{loom}}
 #'
-#' @export subset.loom
+#' @export
 #' @method subset loom
 #'
 subset.loom <- function(
