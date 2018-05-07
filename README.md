@@ -1,6 +1,6 @@
 ![Travis](https://img.shields.io/travis/mojaveazure/loomR.svg?style=for-the-badge)
-<!-- ![AppVeyor](https://img.shields.io/appveyor/ci/mojaveazure/loomR.svg?style=for-the-badge) -->
 [![forthebadge](https://forthebadge.com/images/badges/gluten-free.svg)](https://forthebadge.com)
+<!-- ![AppVeyor](https://img.shields.io/appveyor/ci/mojaveazure/loomR.svg?style=for-the-badge) -->
 <!-- ![CRAN](https://img.shields.io/cran/v/loomR.svg?style=for-the-badge) -->
 
 # loomR
