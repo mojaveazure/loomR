@@ -1,3 +1,4 @@
+#' @importFrom hdf5r h5const
 #' @importFrom methods setOldClass
 NULL
 
@@ -157,8 +158,13 @@ NULL
 #'
 NULL
 
-# Hooks to set loom as an S4 class upon
-# loadNamespace or library/require
 .onLoad <- function(libname, pkgname) {
+  # Hooks to set loom as an S4 class upon
+  # loadNamespace or library/require
   setOldClass(Classes = 'loom')
+  # Set options that I can use to pull information later
+  options(
+    'loomR.ascii' = h5const$H5T_CSET_ASCII,
+    'loomR.string_len' = 7
+  )
 }

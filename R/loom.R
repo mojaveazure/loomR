@@ -8,15 +8,14 @@ NULL
 #'
 #'
 #' @docType class
-#' @name loom
-#' @rdname loom
-#' @aliases loom-class
+#' @name loom-class
+#' @rdname loom-class
+#' @aliases loom
 #' @format An \code{\link{R6::R6Class}} object
 #' @seealso \code{\link{loomR}}, \code{\link{hdf5r::H5File}}
 #'
 #' @field version Version of loomR object was created under
 #' @field shape Shape of \code{/matrix} in genes (columns) by cells (rows)
-#' @field chunksize Chunks set for this dataset in columns (cells) by rows (genes)
 #' @field matrix The main data matrix, stored as columns (cells) by rows (genes)
 #' @field layers Additional data matricies, the same shape as \code{/matrix}
 #' @field col.attrs Extra information about cells
@@ -156,7 +155,6 @@ loom <- R6Class(
     # Fields
     version = NULL,
     shape = NULL,
-    chunksize = NULL,
     matrix = NULL,
     layers = NULL,
     col.attrs = NULL,
@@ -187,23 +185,7 @@ loom <- R6Class(
         } else {
           self$matrix <- self[['matrix']]
         }
-        self$shape <- rev(self[['matrix']]$dims)
-        # Store the chunk size
-        chunks <- tryCatch(
-          expr = h5attr(x = self, which = 'chunks'),
-          error = function(e) {
-            hchunks <- self[['matrix']]$chunk_dims
-            pchunks <- paste0('(', paste(hchunks, collapse = ', '), ')')
-            if (mode != 'r') {
-              h5attr(x = self, which = 'chunks') <- pchunks
-            }
-            return(pchunks)
-          }
-        )
-        chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
-        chunks <- unlist(x = strsplit(x = chunks, split = ','))
-        self$chunksize <- as.integer(x = chunks)
+        self$update.shape()
         # Store version information
         self$version <- as.character(x = tryCatch(
           # Try getting a version
@@ -321,10 +303,16 @@ loom <- R6Class(
       )
       invisible(x = self)
     },
-    add.layer = function(layers, chunk.size = 1000, overwrite = FALSE) {
+    add.layer = function(
+      layers,
+      chunk.size = 1000,
+      overwrite = FALSE,
+      display.progress = TRUE
+    ) {
       if (self$mode == 'r') {
         stop(private$err_mode)
       }
+      self$update.shape()
       # Value checking
       if (!is.list(x = layers) || is.null(x = names(x = layers))) {
         stop("'layers' must be a named list")
@@ -333,8 +321,7 @@ loom <- R6Class(
         stop(private$err_init)
       }
       # Add layers
-      for (i in 1:length(x = layers)) {
-        # if (!is.matrix(x = layers[[i]])) {
+      for (i in 1L:length(x = layers)) {
         if (!inherits(x = layers[[i]], what = c('Matrix', 'matrix'))) {
           layers[[i]] <- as.matrix(x = layers[[i]])
         }
@@ -368,34 +355,67 @@ loom <- R6Class(
             ))
           }
         }
-        dtype <- getDtype(x = layers[[i]][1, 1])
+        dtype <- guess_dtype(
+          x = layers[[i]][1, 1],
+          string_len = getOption(x = "loomR.string_len")
+        )
+        try(
+          expr = {
+            if (dtype$get_cset() != getOption(x = 'loomR.ascii')) {
+              dtype$set_cset(cset = getOption(x = "loomR.ascii"))
+            }
+          },
+          silent = TRUE
+        )
+        layer.shape <- dim(x = layers[[i]])
+        layer.space <- H5S$new(
+          type = 'simple',
+          dims = layer.shape,
+          maxdims = c(Inf, layer.shape[2])
+        )
+        chunk.dims <- guess_chunks(
+          space_maxdims = layer.space$maxdims,
+          dtype_size = dtype$get_size(),
+          chunk_size = 4e9
+        )
+        gc(verbose = FALSE)
+        dim.diff <- layer.space$maxdims[2] - chunk.dims[2]
+        chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
         self[['layers']]$create_dataset(
           name = layer.name,
           dtype = dtype,
-          dims = dim(x = layers[[i]])
+          space = layer.space,
+          chunk_dims = chunk.dims
         )
+        chunk.size <- chunk.dims[1]
         chunk.points <- chunkPoints(
           data.size = dim(x = layers[[i]])[1],
           chunk.size = chunk.size
         )
-        # if (display.progress) {
-        #   pb <- txtProgressBar(char = '=', style = 3)
-        # }
+        if (display.progress) {
+          catn(
+            "Adding a layer to",
+            names(x = layers)[i],
+            "(layer",
+            i,
+            "of",
+            paste0(length(x = layers), ')')
+          )
+          pb <- new.pb()
+        }
         for (col in 1:ncol(x = chunk.points)) {
           row.start <- chunk.points[1, col]
           row.end <- chunk.points[2, col]
           self[['layers']][[layer.name]][row.start:row.end, ] <- as.matrix(
             x = layers[[i]][row.start:row.end, ]
           )
-          # if (display.progress) {
-          #   setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
-          # }
+          if (display.progress) {
+            setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
+          }
         }
-        # self[['layers']]$create_dataset(
-        #   name = names(x = layers)[i],
-        #   robj = layers[[i]],
-        #   chunk_dims = self$chunksize
-        # )
+        if (display.progress) {
+          close(con = pb)
+        }
       }
       self$flush()
       gc(verbose = FALSE)
@@ -406,6 +426,7 @@ loom <- R6Class(
       if (self$mode == 'r') {
         stop(private$err_mode)
       }
+      self$update.shape()
       # Value checking
       if (is.data.frame(x = attribute)) {
         attribute <- as.list(x = attribute)
@@ -414,16 +435,11 @@ loom <- R6Class(
       if (!is.actual.list || is.null(x = names(x = attribute))) {
         stop("Attributes must be provided as a named list")
       }
-      # if (is.data.frame(x = attribute)) {
-      #   attribute <- as.list(x = attribute)
-      # }
-      # if (!is.list(x = attribute) || is.null(x = names(x = attribute))) {
-      #   stop("'attribute' must be a named list")
-      # }
       if (!MARGIN %in% c(1, 2)) {
         stop("'MARGIN' must be 1 or 2")
       }
-      length.use <- rev(x = self[['matrix']]$dims)[MARGIN]
+      # length.use <- rev(x = self[['matrix']]$dims)[MARGIN]
+      length.use <- self$shape[MARGIN]
       dim.msg <- paste(
         "At least one dimmension for each",
         switch(EXPR = MARGIN, '1' = 'gene', '2' = 'cell'),
@@ -593,6 +609,56 @@ loom <- R6Class(
       )
       return(graph)
     },
+    get.sparse = function(
+      name,
+      genes.use = NULL,
+      cells.use = NULL,
+      chunk.size = 1000,
+      display.progress = TRUE
+    ) {
+      self$update.shape()
+      genes.use <- if (is.null(x = genes.use)) {
+        1L:self$shape[1]
+      } else {
+        sort(x = genes.use)
+      }
+      cells.use <- if (is.null(x = cells.use)) {
+        1L:self$shape[2]
+      } else {
+        sort(x = cells.use)
+      }
+      datasets.avail <- c(
+        '/matrix',
+        list.datasets(object = self, path = '/layers', full.names = TRUE)
+      )
+      dataset.use <- grep(pattern = name, x = datasets.avail, value = TRUE)
+      if (length(x = dataset.use) < 1) {
+        stop("find")
+      } else if (length(x = dataset.use) > 1) {
+        stop("ambiguous")
+      }
+      data.return <- Matrix(
+        data = vector(mode = class(x = self[[dataset.use]]$get_fill_value()), length = 1L),
+        # nrow = self$shape[1],
+        nrow = length(x = genes.use),
+        # ncol = self$shape[2],
+        ncol = length(x = cells.use),
+        sparse = TRUE
+      )
+      if (display.progress) {
+        catn("Reading in", dataset.use, "as a sparse matrix")
+        pb <- txtProgressBar(char = '=', style = 3)
+      }
+      batch <- self$batch.scan(
+        chunk.size = chunk.size,
+        MARGIN = 2,
+        dataset.use = dataset.use,
+        force.reset = TRUE
+      )
+      for (i in 1L:length(x = batch)) {
+        chunk.indices <-self$batch.next(return.data = FALSE)
+      }
+    },
     # Chunking functions
     batch.scan = function(
       chunk.size = NULL,
@@ -626,7 +692,8 @@ loom <- R6Class(
           private$iter.margin <- MARGIN
         }
         if (is.null(x = chunk.size)) {
-          chunk.size <- rev(x = self$chunksize)[private$iter.margin]
+          chunk.size <- rev(x = self[[private$iter.dataset]]$chunk_dims)[private$iter.margin]
+          # chunk.size <- rev(x = self$chunksize)[private$iter.margin]
         }
         private$iter.chunksize <- chunk.size
         # Set the indices to use
@@ -784,18 +851,46 @@ loom <- R6Class(
       # Get a connection to the group we're iterating over
       group <- self[[results.dirname]]
       # Make results dataset
-      dtype.use <- getDtype(x = na.use)
-      dims.use <- switch(
-        EXPR = results.dirname,
-        'layers' = self[['matrix']]$dims,
-        'row_attrs' = self[['matrix']]$dims[2],
-        'col_attrs' = self[['matrix']]$dims[1]
+      dtype.use <- guess_dtype(
+        x = na.use,
+        string_len = getOption(x = "loomR.string_len")
       )
+      switch(
+        EXPR = results.dirname,
+        'layers' = {
+          dims.use <- self[['matrix']]$dims
+          max.dims <- c(Inf, dims.use[2])
+        },
+        'row_attrs' = {
+          max.dims <- dims.use <- self[['matrix']]$dims[2]
+        },
+        'col_attrs' = {
+          dims.use <- self[['matrix']]$dims[1]
+          max.dims <- Inf
+        }
+      )
+      results.space <- H5S$new(
+        type = 'simple',
+        dims = dims.use,
+        maxdims = max.dims
+      )
+      chunk.dims <- guess_chunks(
+        space_maxdims = results.space$maxdims,
+        dtype_size = dtype.use$get_size(),
+        chunk_size = 4e9
+      )
+      gc(verbose = FALSE)
+      if (length(x = chunk.dims) == 2) {
+        dim.diff = results.space$maxdims[2] - chunk.dims[2]
+        chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
+      }
       group$create_dataset(
         name = results.basename,
         dtype = dtype.use,
-        dims = dims.use
+        space = results.space,
+        chunk_dims = chunk.dims
       )
+      chunk.size = chunk.dims[1]
       # Start the iteration
       if (display.progress) {
         catn("Writing results to", name)
@@ -1260,11 +1355,10 @@ loom <- R6Class(
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
 #' @param layers A named list of matrices to be added as layers
-#' @param chunk.dims A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize
 #' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns
 #' @param calc.numi Calculate number of UMIs and genes expressed per cell? Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
 #' To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)
-#' @param chunk.size How many rows of \code{data} should we stream to the loom file at any given time?
+#' @param max.size Unused, will be settable in the future
 #' @param overwrite Overwrite an already existing loom file?
 #' @param display.progress Display a progress bar
 #'
@@ -1282,12 +1376,12 @@ create <- function(
   gene.attrs = NULL,
   cell.attrs = NULL,
   layers = NULL,
-  chunk.dims = 'auto',
-  chunk.size = 1000,
+  max.size = '4gb',
   do.transpose = TRUE,
   calc.numi = FALSE,
   overwrite = FALSE,
-  display.progress = TRUE
+  display.progress = TRUE,
+  ...
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
   if (file.exists(filename) && !overwrite) {
@@ -1296,17 +1390,8 @@ create <- function(
   if (!inherits(x = data, what = c('matrix', 'Matrix'))) {
     data <- as.matrix(x = data)
   }
-  if (length(x = chunk.dims) > 2 || length(x = chunk.dims) < 1) {
-    stop("'chunk.dims' must be a one- or two-length integer vector or 'auto'")
-  } else if (length(x = chunk.dims) == 1) {
-    if (!grepl(pattern = '^auto$', x = chunk.dims, perl = TRUE)) {
-      chunk.dims <- rep.int(x = as.integer(x = chunk.dims), times = 2)
-    }
-  } else {
-    chunk.dims <- as.integer(x = chunk.dims)
-  }
   new.loom <- loom$new(filename = filename, mode = mode)
-  dtype <- getDtype(x = data[1, 1])
+  dtype <- guess_dtype(x = data[1, 1], string_len = getOption(x = "loomR.string_len"))
   matrix.shape <- dim(x = data)
   if (do.transpose) {
     cate("Transposing input data: loom file will show input columns (cells) as rows and input rows (genes) as columns")
@@ -1316,14 +1401,34 @@ create <- function(
     cate("Not tranposing data: loom file will show data exactly like input")
     cate("Please note, other loom tools will show this flipped")
   }
+  matrix.space <- H5S$new(
+    type = 'simple',
+    dims = matrix.shape,
+    maxdims = c(Inf, matrix.shape[2])
+  )
+  chunk.dims <- guess_chunks(
+    space_maxdims = matrix.space$maxdims,
+    dtype_size = dtype$get_size(),
+    chunk_size = 4e9
+  )
+  gc(verbose = FALSE)
+  dim.diff <- matrix.space$maxdims[2] - chunk.dims[2]
+  chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
   new.loom$create_dataset(
     name = 'matrix',
     dtype = dtype,
-    dims = matrix.shape
+    space = matrix.space,
+    chunk_dims = chunk.dims
   )
+  chunk.size <- chunk.dims[1]
   chunk.points <- chunkPoints(
     data.size = matrix.shape[1],
     chunk.size = chunk.size
+  )
+  h5attr(x = new.loom, which = 'chunks') <- paste0(
+    '(',
+    paste(chunk.dims, collapse = ', '),
+    ')'
   )
   if (display.progress) {
     pb <- txtProgressBar(char = '=', style = 3)
@@ -1340,6 +1445,10 @@ create <- function(
     if (display.progress) {
       setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
     }
+    gc(verbose = FALSE)
+  }
+  if (display.progress) {
+    close(con = pb)
   }
   new.loom$matrix <- new.loom[['matrix']]
   new.loom$shape <- rev(x = new.loom[['matrix']]$dims)
@@ -1372,7 +1481,7 @@ create <- function(
   )
   # Add layers
   if (!is.null(x = layers)) {
-    new.loom$add.layer(layer = layers)
+    new.loom$add.layer(layer = layers, display.progress = display.progress)
   }
   if (!is.null(x = gene.attrs)) {
     new.loom$add.row.attribute(attribute = gene.attrs)
@@ -1390,12 +1499,6 @@ create <- function(
       is.expr = is.expr
     )
   }
-  # Set last bit of information
-  chunks <- new.loom[['matrix']]$chunk_dims
-  chunks <- gsub(pattern = '(', replacement = '', x = chunks, fixed = TRUE)
-  chunks <- gsub(pattern = ')', replacement = '', x = chunks, fixed = TRUE)
-  chunks <- unlist(x = strsplit(x = chunks, split = ','))
-  new.loom$chunksize <- as.integer(x = chunks)
   # Return the connection
   return(new.loom)
 }
