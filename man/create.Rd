@@ -5,9 +5,8 @@
 \title{Create a loom object}
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
-  layers = NULL, chunk.dims = "auto", chunk.size = 1000,
-  do.transpose = TRUE, calc.numi = FALSE, overwrite = FALSE,
-  display.progress = TRUE)
+  layers = NULL, max.size = "4gb", do.transpose = TRUE,
+  calc.numi = FALSE, overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
@@ -20,9 +19,7 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 
 \item{layers}{A named list of matrices to be added as layers}
 
-\item{chunk.dims}{A one- or two-length integer vector of chunksizes for \code{/matrix}, defaults to 'auto' to automatically determine chunksize}
-
-\item{chunk.size}{How many rows of \code{data} should we stream to the loom file at any given time?}
+\item{max.size}{Unused, will be settable in the future}
 
 \item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns}
 
