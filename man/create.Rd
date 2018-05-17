@@ -6,7 +6,8 @@
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
   layers = NULL, max.size = "4gb", do.transpose = TRUE,
-  calc.numi = FALSE, overwrite = FALSE, display.progress = TRUE, ...)
+  calc.numi = FALSE, overwrite = FALSE, display.progress = TRUE,
+  dtype = NULL, chunk.dims = NULL, chunk.size = NULL, ...)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
@@ -29,6 +30,12 @@ To set a custom threshold for gene expression, pass an integer value (eg. \code{
 \item{overwrite}{Overwrite an already existing loom file?}
 
 \item{display.progress}{Display a progress bar}
+
+\item{dtype}{Data type (h5type) used in matrix; auto-determined by default}
+
+\item{chunk.dims}{Matrix chunk dimensions; auto-determined by default}
+
+\item{chunk.size}{Maximum number of cells read/written to disk at once; auto-determined by default}
 }
 \value{
 A connection to a loom file

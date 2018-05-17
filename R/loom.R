@@ -1365,6 +1365,9 @@ loom <- R6Class(
 #' @param max.size Unused, will be settable in the future
 #' @param overwrite Overwrite an already existing loom file?
 #' @param display.progress Display a progress bar
+#' @param dtype Data type (h5type) used in matrix; auto-determined by default
+#' @param chunk.dims Matrix chunk dimensions; auto-determined by default
+#' @param chunk.size Maximum number of cells read/written to disk at once; auto-determined by default
 #'
 #' @return A connection to a loom file
 #'
@@ -1805,6 +1808,7 @@ subset.loom <- function(
 #' @param order.by Optional row attribute to order each input loom by, must be one dimensional
 #' @param overwrite Overwrite \code{filename} if already exists?
 #' @param display.progress Display progress as we're copying over data
+#' @param chunk.dims Chunk dimensions used for matrix; will be copied from first file by default
 #' @param ... Ignored for now
 #'
 #' @return A loom object connected to \code{filename}
