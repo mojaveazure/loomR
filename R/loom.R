@@ -860,13 +860,16 @@ loom <- R6Class(
         'layers' = {
           dims.use <- self[['matrix']]$dims
           max.dims <- c(Inf, dims.use[2])
+          max.chunk.dims <- self[['matrix']]$dims
         },
         'row_attrs' = {
           max.dims <- dims.use <- self[['matrix']]$dims[2]
+          max.chunk.dims <- self[['matrix']]$dims[2]
         },
         'col_attrs' = {
           dims.use <- self[['matrix']]$dims[1]
           max.dims <- Inf
+          max.chunk.dims <- self[['matrix']]$dims[1]
         }
       )
       results.space <- H5S$new(
@@ -884,6 +887,7 @@ loom <- R6Class(
         dim.diff = results.space$maxdims[2] - chunk.dims[2]
         chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
       }
+      chunk.dims <- pmin(chunk.dims, max.chunk.dims)
       group$create_dataset(
         name = results.basename,
         dtype = dtype.use,
@@ -1381,6 +1385,9 @@ create <- function(
   calc.numi = FALSE,
   overwrite = FALSE,
   display.progress = TRUE,
+  dtype = NULL,
+  chunk.dims = NULL,
+  chunk.size = NULL,
   ...
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
@@ -1391,7 +1398,9 @@ create <- function(
     data <- as.matrix(x = data)
   }
   new.loom <- loom$new(filename = filename, mode = mode)
-  dtype <- guess_dtype(x = data[1, 1], string_len = getOption(x = "loomR.string_len"))
+  if (is.null(dtype)) {
+    dtype <- guess_dtype(x = data[1, 1], string_len = getOption(x = "loomR.string_len"))
+  }
   matrix.shape <- dim(x = data)
   if (do.transpose) {
     cate("Transposing input data: loom file will show input columns (cells) as rows and input rows (genes) as columns")
@@ -1406,21 +1415,26 @@ create <- function(
     dims = matrix.shape,
     maxdims = c(Inf, matrix.shape[2])
   )
-  chunk.dims <- guess_chunks(
-    space_maxdims = matrix.space$maxdims,
-    dtype_size = dtype$get_size(),
-    chunk_size = 4e9
-  )
-  gc(verbose = FALSE)
-  dim.diff <- matrix.space$maxdims[2] - chunk.dims[2]
-  chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
+  if (is.null(chunk.dims)) {
+    chunk.dims <- guess_chunks(
+      space_maxdims = matrix.space$maxdims,
+      dtype_size = dtype$get_size(),
+      chunk_size = 4e9
+    )
+    gc(verbose = FALSE)
+    dim.diff <- matrix.space$maxdims[2] - chunk.dims[2]
+    chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
+  }
+  chunk.dims <- pmin(chunk.dims, matrix.shape)
   new.loom$create_dataset(
     name = 'matrix',
     dtype = dtype,
     space = matrix.space,
     chunk_dims = chunk.dims
   )
-  chunk.size <- chunk.dims[1]
+  if (is.null(chunk.size)) {
+    chunk.size <- chunk.dims[1]
+  }
   chunk.points <- chunkPoints(
     data.size = matrix.shape[1],
     chunk.size = chunk.size
@@ -1808,6 +1822,7 @@ combine <- function(
   order.by = NULL,
   overwrite = FALSE,
   display.progress = TRUE,
+  chunk.dims = NULL,
   ...
 ) {
   if (is.character(x = looms)) {
@@ -1860,6 +1875,7 @@ combine <- function(
   nrows <- vector(mode = 'integer', length = length(x = looms))
   ncols <- vector(mode = 'integer', length = length(x = looms))
   matrix.type <- vector(mode = 'list', length = length(x = looms))
+  loom.chunk.dims <- vector(mode = 'list', length = length(x = looms))
   if (display.progress) {
     catn("Validating", length(x = looms), "input loom files")
     pb <- new.pb()
@@ -1952,6 +1968,7 @@ combine <- function(
     nrows[i] <- this[['matrix']]$dims[2]
     ncols[i] <- this[['matrix']]$dims[1]
     matrix.type[[i]] <- class(x = this[['matrix']]$get_type())[1]
+    loom.chunk.dims[[i]] <- as.numeric(strsplit(h5attr(this, 'chunks'), split = '[\\(, \\)]+')[[1]][2:3])
     if (is.character(x = looms[[i]])) {
       this$close_all()
     }
@@ -1964,6 +1981,9 @@ combine <- function(
   }
   nrows <- unique(x = nrows)
   ncells <- sum(ncols)
+  if (is.null(chunk.dims)) {
+    chunk.dims <- loom.chunk.dims[[1]]  # for now, just copy from first file
+  }
   # if (length(x = row.attrs) != 1) {
   #   stop("Not all loom objects have the same row attributes")
   # }
@@ -2059,7 +2079,8 @@ combine <- function(
   new.loom$create_dataset(
     name = 'matrix', # Name is '/matrix'
     dtype = getDtype2(x = matrix.type), # Use the single type that we got from above
-    dims = c(ncells, nrows) # Use the number of cells from the sum of ncols above, nrows should be the same for everyone
+    dims = c(ncells, nrows), # Use the number of cells from the sum of ncols above, nrows should be the same for everyone
+    chunk_dims = chunk.dims
   )
   for (lay in layers) {
     if (length(x = lay) > 1) {
