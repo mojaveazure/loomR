@@ -5,9 +5,9 @@
 \title{Create a loom object}
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
-  layers = NULL, max.size = "4gb", do.transpose = TRUE,
-  calc.numi = FALSE, overwrite = FALSE, display.progress = TRUE,
-  dtype = NULL, chunk.dims = NULL, chunk.size = NULL, ...)
+  layers = NULL, do.transpose = TRUE, calc.numi = FALSE,
+  max.size = "4gb", dtype = NULL, chunk.dims = NULL, chunk.size = NULL,
+  overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
@@ -16,26 +16,30 @@ create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
 
 \item{gene.attrs}{A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}}
 
-\item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}}
+\item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
+Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};}
 
 \item{layers}{A named list of matrices to be added as layers}
 
-\item{max.size}{Unused, will be settable in the future}
-
 \item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns}
 
-\item{calc.numi}{Calculate number of UMIs and genes expressed per cell? Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
+\item{calc.numi}{Calculate number of UMIs and genes expressed per cell?
 To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)}
 
-\item{overwrite}{Overwrite an already existing loom file?}
-
-\item{display.progress}{Display a progress bar}
+\item{max.size}{Set maximum chunk size in terms of memory usage, unused if \code{chunk.dims} is set;
+may pass a character string (eg. \code{3gb}, \code{1200mb}) or exact value in bytes}
 
 \item{dtype}{Data type (h5type) used in matrix; auto-determined by default}
 
 \item{chunk.dims}{Matrix chunk dimensions; auto-determined by default}
 
 \item{chunk.size}{Maximum number of cells read/written to disk at once; auto-determined by default}
+
+\item{overwrite}{Overwrite an already existing loom file?}
+
+\item{display.progress}{Display a progress bar}
+
+\item{...}{Ignored for now}
 }
 \value{
 A connection to a loom file

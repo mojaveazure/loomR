@@ -1358,16 +1358,19 @@ loom <- R6Class(
 #' @param data The data for \code{/matrix}. If cells are rows and genes are columns, set \code{do.transpose = FALSE}; otherwise, set \code{do.transpose = TRUE}
 #' @param gene.attrs A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}
 #' @param cell.attrs A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
+#' Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
 #' @param layers A named list of matrices to be added as layers
 #' @param do.transpose Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns
-#' @param calc.numi Calculate number of UMIs and genes expressed per cell? Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};
+#' @param calc.numi Calculate number of UMIs and genes expressed per cell?
 #' To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)
-#' @param max.size Unused, will be settable in the future
-#' @param overwrite Overwrite an already existing loom file?
-#' @param display.progress Display a progress bar
+#' @param max.size Set maximum chunk size in terms of memory usage, unused if \code{chunk.dims} is set;
+#' may pass a character string (eg. \code{3gb}, \code{1200mb}) or exact value in bytes
 #' @param dtype Data type (h5type) used in matrix; auto-determined by default
 #' @param chunk.dims Matrix chunk dimensions; auto-determined by default
 #' @param chunk.size Maximum number of cells read/written to disk at once; auto-determined by default
+#' @param overwrite Overwrite an already existing loom file?
+#' @param display.progress Display a progress bar
+#' @param ... Ignored for now
 #'
 #' @return A connection to a loom file
 #'
@@ -1383,14 +1386,14 @@ create <- function(
   gene.attrs = NULL,
   cell.attrs = NULL,
   layers = NULL,
-  max.size = '4gb',
   do.transpose = TRUE,
   calc.numi = FALSE,
-  overwrite = FALSE,
-  display.progress = TRUE,
+  max.size = '4gb',
   dtype = NULL,
   chunk.dims = NULL,
   chunk.size = NULL,
+  overwrite = FALSE,
+  display.progress = TRUE,
   ...
 ) {
   mode <- ifelse(test = overwrite, yes = 'w', no = 'w-')
@@ -1401,8 +1404,10 @@ create <- function(
     data <- as.matrix(x = data)
   }
   new.loom <- loom$new(filename = filename, mode = mode)
-  if (is.null(dtype)) {
+  if (is.null(x = dtype)) {
     dtype <- guess_dtype(x = data[1, 1], string_len = getOption(x = "loomR.string_len"))
+  } else if (!inherits(x = dtype, what = 'H5T')) {
+    stop("'dtype' must be an HDF5 type, please see '?h5types'")
   }
   matrix.shape <- dim(x = data)
   if (do.transpose) {
@@ -1418,11 +1423,16 @@ create <- function(
     dims = matrix.shape,
     maxdims = c(Inf, matrix.shape[2])
   )
-  if (is.null(chunk.dims)) {
+  if (is.null(x = chunk.dims)) {
+    mem.size <- charToBytes(x = max.size)
+    if (mem.size > 4e9) {
+      cate("HDF5 limits internal chunk sizes to 4 GB, setting to 4 GB")
+      mem.size <- 4e9
+    }
     chunk.dims <- guess_chunks(
       space_maxdims = matrix.space$maxdims,
       dtype_size = dtype$get_size(),
-      chunk_size = 4e9
+      chunk_size = mem.size
     )
     gc(verbose = FALSE)
     dim.diff <- matrix.space$maxdims[2] - chunk.dims[2]

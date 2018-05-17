@@ -40,6 +40,60 @@ PointerToIndex <- function(p) {
   return(j)
 }
 
+# Try to convert a character vector to bytes
+#
+# @param x A character vector
+#
+# @return the value of said string in bytes
+#
+#' @importFrom stringr str_extract
+#
+charToBytes <- function(x) {
+  x <- as.character(x = x)
+  patterns <- c('^\\d+[A-Z]?b?$', '^\\d\\.?\\d*e[\\+-]\\d+$')
+  x <- unlist(x = sapply(
+    X = patterns,
+    FUN = grep,
+    USE.NAMES = FALSE,
+    x = x,
+    perl = TRUE,
+    ignore.case = TRUE,
+    value = TRUE
+  ))
+  if (length(x = x) < 1) {
+    stop(paste(
+      "No valid character strings passed\n",
+      "values in 'x' must pass either the",
+      paste(patterns, collapse = '\n or '),
+      "regex pattern"
+    ))
+  }
+  x <- tolower(x = x)
+  bytes <- vapply(
+    X = x,
+    FUN = function(i) {
+      exp <- FALSE
+      mult.factor <- if (grepl(pattern = 'k', x = i)) {
+        1e3
+      } else if (grepl(pattern = 'm', x = i)) {
+        1e6
+      } else if (grepl(pattern = 'g', x = i)) {
+        1e9
+      } else {
+        1
+      }
+      if (grepl(pattern = patterns[2], x = i)) {
+        return(as.numeric(x = i))
+      }
+      dig <- as.numeric(x = str_extract(string = i, pattern = '\\d+'))
+      return(dig * mult.factor)
+    },
+    FUN.VALUE = numeric(length = 1L),
+    USE.NAMES = FALSE
+  )
+  return(bytes)
+}
+
 # Get HDF5 data types
 #
 # @param x An R object or string describing HDF5 datatype

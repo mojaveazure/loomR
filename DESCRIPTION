@@ -21,7 +21,9 @@ Depends:
 Imports:
   utils,
   Matrix,
-  methods
+  methods,
+  stringr,
+  stats
 Collate:
   'internal.R'
   'loom.R'
