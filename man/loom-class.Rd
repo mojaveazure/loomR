@@ -105,6 +105,8 @@ A class for connections loom files
       \item{\code{dataset.use}}{Name of dataset to use}
       \item{\code{overwrite}}{Overite \code{name} if already exists}
       \item{\code{display.progress}}{Display progress}
+      \item{\code{max.size}}{Maximum HDF5 chunk size}
+      \item{\code{chunk.dims}}{HDF5 chunk dimensions}
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }

@@ -109,7 +109,7 @@ charToBytes <- function(x) {
 getDtype <- function(x) {
   return(switch(
     EXPR = class(x = x),
-    'numeric' = h5types$double,
+    'numeric' = h5types$float,
     'integer' = h5types$int,
     'character' = H5T_STRING$new(size = Inf),
     'logical' = H5T_LOGICAL$new(),

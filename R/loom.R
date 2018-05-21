@@ -97,6 +97,8 @@ NULL
 #'       \item{\code{dataset.use}}{Name of dataset to use}
 #'       \item{\code{overwrite}}{Overite \code{name} if already exists}
 #'       \item{\code{display.progress}}{Display progress}
+#'       \item{\code{max.size}}{Maximum HDF5 chunk size}
+#'       \item{\code{chunk.dims}}{HDF5 chunk dimensions}
 #'       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
 #'     }
 #'   }
@@ -385,7 +387,8 @@ loom <- R6Class(
           name = layer.name,
           dtype = dtype,
           space = layer.space,
-          chunk_dims = chunk.dims
+          chunk_dims = chunk.dims,
+          gzip_level = 4
         )
         chunk.size <- chunk.dims[1]
         chunk.points <- chunkPoints(
@@ -752,6 +755,9 @@ loom <- R6Class(
       dataset.use = 'matrix',
       overwrite = FALSE,
       display.progress = TRUE,
+      max.size = '4gb',
+      chunk.dims = NULL,
+      dtype.use = NULL,
       ...
     ) {
       if (self$mode == 'r') {
@@ -851,10 +857,12 @@ loom <- R6Class(
       # Get a connection to the group we're iterating over
       group <- self[[results.dirname]]
       # Make results dataset
-      dtype.use <- guess_dtype(
-        x = na.use,
-        string_len = getOption(x = "loomR.string_len")
-      )
+      if (is.null(x = dtype.use)) {
+        dtype.use <- guess_dtype(
+          x = na.use,
+          string_len = getOption(x = "loomR.string_len")
+        )
+      }
       switch(
         EXPR = results.dirname,
         'layers' = {
@@ -877,22 +885,30 @@ loom <- R6Class(
         dims = dims.use,
         maxdims = max.dims
       )
-      chunk.dims <- guess_chunks(
-        space_maxdims = results.space$maxdims,
-        dtype_size = dtype.use$get_size(),
-        chunk_size = 4e9
-      )
-      gc(verbose = FALSE)
-      if (length(x = chunk.dims) == 2) {
-        dim.diff = results.space$maxdims[2] - chunk.dims[2]
-        chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
+      if (is.null(x = chunk.dims)) {
+        mem.size <- charToBytes(x = max.size)
+        if (mem.size > 4e9) {
+          cate("HDF5 limits internal chunk sizes to 4 GB, setting to 4 GB")
+          mem.size <- 4e9
+        }
+        chunk.dims <- guess_chunks(
+          space_maxdims = results.space$maxdims,
+          dtype_size = dtype.use$get_size(),
+          chunk_size = mem.size
+        )
+        gc(verbose = FALSE)
+        if (length(x = chunk.dims) == 2) {
+          dim.diff = results.space$maxdims[2] - chunk.dims[2]
+          chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
+        }
       }
       chunk.dims <- pmin(chunk.dims, max.chunk.dims)
       group$create_dataset(
         name = results.basename,
         dtype = dtype.use,
         space = results.space,
-        chunk_dims = chunk.dims
+        chunk_dims = chunk.dims,
+        gzip_level = 4
       )
       chunk.size = chunk.dims[1]
       # Start the iteration
@@ -1443,7 +1459,8 @@ create <- function(
     name = 'matrix',
     dtype = dtype,
     space = matrix.space,
-    chunk_dims = chunk.dims
+    chunk_dims = chunk.dims,
+    gzip_level = 4
   )
   if (is.null(chunk.size)) {
     chunk.size <- chunk.dims[1]
@@ -2094,14 +2111,17 @@ combine <- function(
     name = 'matrix', # Name is '/matrix'
     dtype = getDtype2(x = matrix.type), # Use the single type that we got from above
     dims = c(ncells, nrows), # Use the number of cells from the sum of ncols above, nrows should be the same for everyone
-    chunk_dims = chunk.dims
+    chunk_dims = chunk.dims,
+    gzip_level = 4
   )
   for (lay in layers) {
     if (length(x = lay) > 1) {
       new.loom$create_dataset(
         name = lay,
         dtype = getDtype2(x = layers.types[[lay]]),
-        dims = c(ncells, nrows)
+        dims = c(ncells, nrows),
+        chunk_dims = chunk.dims,
+        gzip_level = 4
       )
     }
   }
