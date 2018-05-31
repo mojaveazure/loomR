@@ -21,7 +21,7 @@
 
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
-\item{display.progress}{Display progress bars?}
+\item{display.progress}{Display a progress bar}
 
 \item{...}{Ignored for now}
 }

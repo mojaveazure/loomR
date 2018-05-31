@@ -18,7 +18,7 @@ combine(looms, filename, chunk.size = 1000, order.by = NULL,
 
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
-\item{display.progress}{Display progress as we're copying over data}
+\item{display.progress}{Display a progress bar as we're copying over data}
 
 \item{chunk.dims}{Chunk dimensions used for matrix; will be copied from first file by default}
 

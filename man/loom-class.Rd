@@ -83,6 +83,24 @@ A class for connections loom files
       }
     }
   }
+  \item{\code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+    Generate indices of chunk size \code{chunk.size} for iteration
+    \describe{
+      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}
+      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+      \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+    }
+  }
+  \item{\code{scan(dataset.use = 'matrix', MARGIN = 2, chunk.size = NULL, index.use = NULL, display.progress = TRUE)}}{
+    Scan through a dataset
+    \describe{
+      \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
+      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+      \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+      \item{\code{display.progress}}{Display a progress bar}
+    }
+  }
   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
     \describe{
@@ -118,7 +136,7 @@ A class for connections loom files
       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
       \item{\code{dataset.use}}{Name of dataset to use}
-      \item{\code{display.progress}}{Display progress}
+      \item{\code{display.progress}}{Display a progress bar}
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
@@ -128,7 +146,7 @@ A class for connections loom files
       \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
       \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
-      \item{\code{display.progress}}{Display progress}
+      \item{\code{display.progress}}{Display a progress bar}
     }
   }
   \item{\code{add.loom(other, other.key, self.key, ...)}}{

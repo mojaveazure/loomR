@@ -506,7 +506,7 @@ addCells.col_attrs <- function(x, m2) {
 #
 #' @importFrom utils txtProgressBar
 #
-new.pb <- function() {
+newPB <- function() {
   return(txtProgressBar(style = 3, char = '='))
 }
 

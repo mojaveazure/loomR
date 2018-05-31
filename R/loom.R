@@ -75,6 +75,24 @@ NULL
 #'       }
 #'     }
 #'   }
+#'   \item{\code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+#'     Generate indices of chunk size \code{chunk.size} for iteration
+#'     \describe{
+#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}
+#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+#'       \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+#'     }
+#'   }
+#'   \item{\code{scan(dataset.use = 'matrix', MARGIN = 2, chunk.size = NULL, index.use = NULL, display.progress = TRUE)}}{
+#'     Scan through a dataset
+#'     \describe{
+#'       \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+#'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
+#'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+#'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+#'       \item{\code{display.progress}}{Display a progress bar}
+#'     }
+#'   }
 #'   \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
 #'     Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
 #'     \describe{
@@ -110,7 +128,7 @@ NULL
 #'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
 #'       \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
 #'       \item{\code{dataset.use}}{Name of dataset to use}
-#'       \item{\code{display.progress}}{Display progress}
+#'       \item{\code{display.progress}}{Display a progress bar}
 #'       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
 #'     }
 #'   }
@@ -120,7 +138,7 @@ NULL
 #'       \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
 #'       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
 #'       \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
-#'       \item{\code{display.progress}}{Display progress}
+#'       \item{\code{display.progress}}{Display a progress bar}
 #'     }
 #'   }
 #'   \item{\code{add.loom(other, other.key, self.key, ...)}}{
@@ -136,7 +154,7 @@ NULL
 #'
 #' @importFrom iterators nextElem
 #' @importFrom itertools hasNext ihasNext ichunk
-#' @importFrom utils packageVersion txtProgressBar setTxtProgressBar
+#' @importFrom utils packageVersion setTxtProgressBar
 #'
 #' @export
 #'
@@ -241,8 +259,7 @@ loom <- R6Class(
         FUN = length,
         FUN.VALUE = integer(length = 1L)
       )
-      graph.lengths <- unique(x = graph.lengths)
-      if (length(x = graph.lengths) > 1) {
+      if (length(x = unique(x = graph.lengths)) > 1) {
         stop("'a', 'b', and 'w' must all be the same length")
       }
       # Check the name, automatically assign a group if provided in `name`
@@ -292,13 +309,10 @@ loom <- R6Class(
           sparse = TRUE
         )
       }
-      a <- mat@i
-      b <- PointerToIndex(p = mat@p)
-      w <- mat@x
       self$add.graph(
-        a = a,
-        b = b,
-        w = w,
+        a = mat@i,
+        b = PointerToIndex(p = mat@p),
+        w = mat@x,
         name = name,
         MARGIN = MARGIN,
         overwrite = overwrite
@@ -404,7 +418,7 @@ loom <- R6Class(
             "of",
             paste0(length(x = layers), ')')
           )
-          pb <- new.pb()
+          pb <- newPB()
         }
         for (col in 1:ncol(x = chunk.points)) {
           row.start <- chunk.points[1, col]
@@ -619,6 +633,7 @@ loom <- R6Class(
       chunk.size = 1000,
       display.progress = TRUE
     ) {
+      return(NULL)
       self$update.shape()
       genes.use <- if (is.null(x = genes.use)) {
         1L:self$shape[1]
@@ -638,7 +653,7 @@ loom <- R6Class(
       if (length(x = dataset.use) < 1) {
         stop("find")
       } else if (length(x = dataset.use) > 1) {
-        stop("ambiguous")
+        stop(private$err_ambiguous)
       }
       data.return <- Matrix(
         data = vector(mode = class(x = self[[dataset.use]]$get_fill_value()), length = 1L),
@@ -650,7 +665,7 @@ loom <- R6Class(
       )
       if (display.progress) {
         catn("Reading in", dataset.use, "as a sparse matrix")
-        pb <- txtProgressBar(char = '=', style = 3)
+        pb <- newPB()
       }
       batch <- self$batch.scan(
         chunk.size = chunk.size,
@@ -663,6 +678,77 @@ loom <- R6Class(
       }
     },
     # Chunking functions
+    chunk.indices = function(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix') {
+      if (!self$exists(name = dataset.use)) {
+        dataset.use <- grep(
+          pattern = dataset.use,
+          x = list.datasets(
+            object = self,
+            path = '/',
+            full.names = TRUE,
+            recursive = TRUE
+          ),
+          value = TRUE
+        )
+      }
+      if (length(x = dataset.use) < 1) {
+        stop("unfound")
+      } else if (length(x = dataset.use) > 1) {
+        stop(private$err_ambiguous)
+      }
+      if (grepl(pattern = 'row_attrs', x = dataset.use)) {
+        MARGIN <- 1
+      } else if (grepl(pattern = 'col_attrs', x = dataset.use)) {
+        MARGIN <- 2
+      }
+      if (!MARGIN %in% c(1, 2)) {
+        stop("MARGIN")
+      }
+      if (is.null(x = chunk.size)) {
+        chunk.size <- self[[dataset.use]]$chunk_dims[-MARGIN]
+      }
+      chunk.points <- chunkPoints(
+        data.size = self[[dataset.use]]$dims[-MARGIN],
+        chunk.size = chunk.size
+      )
+      chunk.indices <- apply(
+        X = chunk.points,
+        MARGIN = 2,
+        FUN = function(x) {
+          return(x[1]:x[2])
+        }
+      )
+      private$iter.scan <- function()
+      return(chunk.indices)
+    },
+    scan = function(
+      check = FALSE,
+      reset = FALSE
+    ) {
+      scan.check <- vapply(
+        X = list(private$counter, private$chunk.indices, private$dataset.use),
+        FUN = is.null,
+        FUN.VALUE = logical(length = 1L)
+      )
+      if (any(scan.check)) {
+        stop('init')
+      } else if (check) {
+        return(private$counter < length(x = private$chunk.indices))
+      } else if (reset) {
+        private$counter <- 0
+        invisible(x = NULL)
+      } else if (private$counter >= length(x = private$chunk.indices)) {
+        return(NULL)
+      } else {
+        private$counter <- private$counter + 1
+        data.return <- if (private$MARGIN == 1) {
+          self[[private$dataset.use]][, private$chunk.indices[[private$counter]]]
+        } else {
+          self[[private$dataset.use]][private$chunk.indices[[private$counter]], ]
+        }
+        return(data.return)
+      }
+    },
     batch.scan = function(
       chunk.size = NULL,
       MARGIN = 2,
@@ -914,7 +1000,7 @@ loom <- R6Class(
       # Start the iteration
       if (display.progress) {
         catn("Writing results to", name)
-        pb <- txtProgressBar(char = '=', style = 3)
+        pb <- newPB()
       }
       # first <- TRUE
       for (i in 1:length(x = batch)) {
@@ -1041,7 +1127,7 @@ loom <- R6Class(
       # Create our results holding object
       results <- vector(mode = "list", length = length(x = batch))
       if (display.progress) {
-        pb <- txtProgressBar(char = '=', style = 3)
+        pb <- newPB()
       }
       for (i in 1:length(x = batch)) {
         # Get the indices we're iterating over
@@ -1142,7 +1228,7 @@ loom <- R6Class(
       # Layer data
       if (display.progress) {
         cate("Adding data to /layers")
-        pb <- new.pb()
+        pb <- newPB()
         counter <- 0
       }
       layers.names <- names(x = self[['layers']])
@@ -1156,7 +1242,7 @@ loom <- R6Class(
       # Column attributes
       if (display.progress) {
         cate("Adding data to /col_attrs")
-        pb <- new.pb()
+        pb <- newPB()
         counter <- 0
       }
       attrs.names <- names(x = self[['col_attrs']])
@@ -1280,6 +1366,8 @@ loom <- R6Class(
     # Fields
     err_init = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
     err_mode = "Cannot modify a loom file in read-only mode",
+    err_ambiguous = "Cannot identify the dataset provided, found too many like it; please be more specific",
+    iter.scan = NULL,
     it = NULL,
     iter.chunksize = NULL,
     iter.dataset = NULL,
@@ -1390,7 +1478,7 @@ loom <- R6Class(
 #'
 #' @return A connection to a loom file
 #'
-#' @importFrom utils packageVersion txtProgressBar setTxtProgressBar
+#' @importFrom utils packageVersion setTxtProgressBar
 #'
 #' @seealso \code{\link{loom}}
 #'
@@ -1462,7 +1550,7 @@ create <- function(
     chunk_dims = chunk.dims,
     gzip_level = 4
   )
-  if (is.null(chunk.size)) {
+  if (is.null(x = chunk.size)) {
     chunk.size <- chunk.dims[1]
   }
   chunk.points <- chunkPoints(
@@ -1475,7 +1563,7 @@ create <- function(
     ')'
   )
   if (display.progress) {
-    pb <- txtProgressBar(char = '=', style = 3)
+    pb <- newPB()
   }
   for (col in 1:ncol(x = chunk.points)) {
     row.start <- chunk.points[1, col]
@@ -1576,7 +1664,7 @@ connect <- function(filename, mode = "r", skip.validate = FALSE) {
 #' @param filename Filename for new loom object, defaults to ...
 #' @param chunk.size Chunk size to iterate through \code{x}
 #' @param overwrite Overwrite \code{filename} if already exists?
-#' @param display.progress Display progress bars?
+#' @param display.progress Display a progress bar
 #' @param ... Ignored for now
 #'
 #' @return A loom object connected to \code{filename}
@@ -1666,7 +1754,7 @@ subset.loom <- function(
     if (!num.layers) {
       cate("No layers found")
     }
-    pb <- new.pb()
+    pb <- newPB()
   }
   if (length(x = layers) > 0) {
     for (layer in layers) {
@@ -1723,7 +1811,7 @@ subset.loom <- function(
   if (length(x = row.attrs) > 0) {
     if (display.progress) {
       catn("Adding", length(x = row.attrs), "row attributes")
-      pb <- new.pb()
+      pb <- newPB()
       counter <- 0
     }
     for (row.attr in row.attrs) {
@@ -1755,7 +1843,7 @@ subset.loom <- function(
   if (length(x = col.attrs) > 0) {
     if (display.progress) {
       catn("Adding", length(x = col.attrs), "column attributes")
-      pb <- new.pb()
+      pb <- newPB()
       counter <- 0
     }
     for (col.attr in col.attrs) {
@@ -1787,7 +1875,7 @@ subset.loom <- function(
   # if (length(x = layers) > 0) {
   #   if (display.progress) {
   #     catn("Adding", length(x = layers), "layers")
-  #     pb <- new.pb()
+  #     pb <- newPB()
   #   }
   #   # Initialize datasets
   #   for (layer in layers) {
@@ -1834,7 +1922,7 @@ subset.loom <- function(
 #' @param chunk.size How many rows from each input loom should we stream to the merged loom file at any given time?
 #' @param order.by Optional row attribute to order each input loom by, must be one dimensional
 #' @param overwrite Overwrite \code{filename} if already exists?
-#' @param display.progress Display progress as we're copying over data
+#' @param display.progress Display a progress bar as we're copying over data
 #' @param chunk.dims Chunk dimensions used for matrix; will be copied from first file by default
 #' @param ... Ignored for now
 #'
@@ -1909,7 +1997,7 @@ combine <- function(
   loom.chunk.dims <- vector(mode = 'list', length = length(x = looms))
   if (display.progress) {
     catn("Validating", length(x = looms), "input loom files")
-    pb <- new.pb()
+    pb <- newPB()
   }
   for (i in 1:length(x = looms)) {
     this <- if (is.character(x = looms[[i]])) {
@@ -2165,7 +2253,7 @@ combine <- function(
     # Add data to /matrix, /col_attrs, and /layers
     if (display.progress) {
       catn("Adding data to /matrix and /layers")
-      pb <- new.pb()
+      pb <- newPB()
     }
     for (col in 1:ncol(x = chunk.points)) {
       cells.use <- chunk.points[1, col]:chunk.points[2, col]
@@ -2195,7 +2283,7 @@ combine <- function(
     # Add col_attrs for this chunk
     if (display.progress) {
       catn("\nAdding data to /col_attrs")
-      pb <- new.pb()
+      pb <- newPB()
     }
     for (j in 1L:length(x = col.attrs)) {
       attr <- col.attrs[j]
@@ -2228,7 +2316,7 @@ combine <- function(
     if (i == 1) {
       if (display.progress) {
         catn("\nCopying data for /row_attrs")
-        pb <- new.pb()
+        pb <- newPB()
       }
       for (attr in list.datasets(object = this, path = 'row_attrs')) {
         new.loom[['row_attrs']]$obj_copy_from(
