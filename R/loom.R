@@ -867,14 +867,19 @@ loom <- R6Class(
       # Checks datset, index, and MARGIN
       # Sets full dataset path in private$iter.dataset
       # Sets proper MARGIN in private$iter.margin
-      batch <- self$batch.scan(
+      chunk.points <- self$chunk.indices(
         chunk.size = chunk.size,
         MARGIN = MARGIN,
-        dataset.use = dataset.use,
-        force.reset = TRUE
+        dataset.use = dataset.use
       )
-      MARGIN <- private$iter.margin
-      dataset.use <- private$iter.dataset
+      # batch <- self$batch.scan(
+      #   chunk.size = chunk.size,
+      #   MARGIN = MARGIN,
+      #   dataset.use = dataset.use,
+      #   force.reset = TRUE
+      # )
+      # MARGIN <- private$iter.margin
+      # dataset.use <- private$iter.dataset
       # Ensure that our group name is allowed
       name.check <- which(x = dirnames == results.dirname)
       if (!any(name.check)) {
@@ -1000,9 +1005,13 @@ loom <- R6Class(
         pb <- newPB()
       }
       # first <- TRUE
-      for (i in 1:length(x = batch)) {
+      # for (i in 1:length(x = batch)) {
+      for (i in 1:ncol(x = chunk.points)) {
         # Get the indices we're iterating over
-        chunk.indices <- self$batch.next(return.data = FALSE)
+        # chunk.indices <- self$batch.next(return.data = FALSE)
+        start <- chunk.points[1, i]
+        end <- chunk.points[2, i]
+        chunk.indices <- start:end
         indices.use <- chunk.indices[chunk.indices %in% index.use]
         indices.use <- indices.use - chunk.indices[1] + 1
         if (length(x = indices.use) < 1) {
