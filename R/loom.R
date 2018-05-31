@@ -396,8 +396,6 @@ loom <- R6Class(
           chunk_size = 4e9
         )
         gc(verbose = FALSE)
-        dim.diff <- layer.space$maxdims[2] - chunk.dims[2]
-        chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
         self[['layers']]$create_dataset(
           name = layer.name,
           dtype = dtype,
@@ -844,7 +842,7 @@ loom <- R6Class(
       dataset.use = 'matrix',
       overwrite = FALSE,
       display.progress = TRUE,
-      max.size = '4gb',
+      max.size = '400mb',
       chunk.dims = NULL,
       dtype.use = NULL,
       ...
@@ -986,10 +984,6 @@ loom <- R6Class(
           chunk_size = mem.size
         )
         gc(verbose = FALSE)
-        if (length(x = chunk.dims) == 2) {
-          dim.diff = results.space$maxdims[2] - chunk.dims[2]
-          chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
-        }
       }
       chunk.dims <- pmin(chunk.dims, max.chunk.dims)
       group$create_dataset(
@@ -1495,7 +1489,7 @@ create <- function(
   layers = NULL,
   do.transpose = TRUE,
   calc.numi = FALSE,
-  max.size = '4gb',
+  max.size = '400mb',
   dtype = NULL,
   chunk.dims = NULL,
   chunk.size = NULL,
@@ -1542,8 +1536,6 @@ create <- function(
       chunk_size = mem.size
     )
     gc(verbose = FALSE)
-    dim.diff <- matrix.space$maxdims[2] - chunk.dims[2]
-    chunk.dims <- chunk.dims + c(-dim.diff, dim.diff)
   }
   chunk.dims <- pmin(chunk.dims, matrix.shape)
   new.loom$create_dataset(
