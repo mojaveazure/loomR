@@ -1016,7 +1016,7 @@ loom <- R6Class(
         indices.use <- indices.use - chunk.indices[1] + 1
         if (length(x = indices.use) < 1) {
           if (display.progress) {
-            setTxtProgressBar(pb = pb, value = i / length(x = batch))
+            setTxtProgressBar(pb = pb, value = i / ncol(x = chunk.points))
           }
           next
         }
@@ -1070,7 +1070,7 @@ loom <- R6Class(
         }
         gc(verbose = FALSE)
         if (display.progress) {
-          setTxtProgressBar(pb = pb, value = i / length(x = batch))
+          setTxtProgressBar(pb = pb, value = i / ncol(x = chunk.points))
         }
       }
       if (display.progress) {
