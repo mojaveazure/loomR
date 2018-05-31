@@ -125,6 +125,7 @@ A class for connections loom files
       \item{\code{display.progress}}{Display progress}
       \item{\code{max.size}}{Maximum HDF5 chunk size}
       \item{\code{chunk.dims}}{HDF5 chunk dimensions}
+      \item{\code{display.progress}}{Display a progress bar}
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
