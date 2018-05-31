@@ -902,7 +902,7 @@ loom <- R6Class(
         ))
       }
       # Check how we store our results
-      dataset.matrix <- ('matrix' %in% private$iter.dataset || grepl(pattern = 'layers', x = private$iter.dataset))
+      dataset.matrix <- ('matrix' %in% dataset.use || grepl(pattern = 'layers', x = dataset.use))
       results.matrix <- name.check == 3
       # Ensure index.use is integers within the bounds of [1, self$shape[MARGIN]]
       if (is.null(x = index.use)) {
