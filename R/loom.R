@@ -712,20 +712,22 @@ loom <- R6Class(
         data.size = self[[dataset.use]]$dims[-MARGIN],
         chunk.size = chunk.size
       )
-      chunk.indices <- apply(
-        X = chunk.points,
-        MARGIN = 2,
-        FUN = function(x) {
-          return(x[1]:x[2])
-        }
-      )
-      private$iter.scan <- function()
-      return(chunk.indices)
+      return(chunk.points)
+      # chunk.indices <- apply(
+      #   X = chunk.points,
+      #   MARGIN = 2,
+      #   FUN = function(x) {
+      #     return(x[1]:x[2])
+      #   }
+      # )
+      # private$iter.scan <- function()
+      # return(chunk.indices)
     },
     scan = function(
       check = FALSE,
       reset = FALSE
     ) {
+      .NotYetImplemented()
       scan.check <- vapply(
         X = list(private$counter, private$chunk.indices, private$dataset.use),
         FUN = is.null,
