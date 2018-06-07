@@ -6,8 +6,8 @@
 \usage{
 create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
   layers = NULL, do.transpose = TRUE, calc.numi = FALSE,
-  max.size = "4gb", dtype = NULL, chunk.dims = NULL, chunk.size = NULL,
-  overwrite = FALSE, display.progress = TRUE, ...)
+  max.size = "400mb", dtype = NULL, chunk.dims = NULL,
+  chunk.size = NULL, overwrite = FALSE, display.progress = TRUE, ...)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
