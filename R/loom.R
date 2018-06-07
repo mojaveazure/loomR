@@ -151,6 +151,18 @@ NULL
 #'       \item{\code{...}}{Ignored for now}
 #'     }
 #'   }
+#'   \item{\code{timestamp(x)}}{
+#'     Timestamp a loom object (group or dataset)
+#'     \describe{
+#'       \item{\code{x}}{A character vector of groups or datasets to timestamp}
+#'     }
+#'   }
+#'   \item{\code{last.modified(x = 'self')}}{
+#'     Get the time an object (group, dataset, file) was most recently modified
+#'     \describe{
+#'       \item{\code{x}}{A character vector of groups or datasets to get the timestamp of, defaults to 'self' or the file as a whole; pass \code{NULL} to get all timestamps present}
+#'     }
+#'   }
 #' }
 #'
 #' @importFrom iterators nextElem
@@ -1323,7 +1335,7 @@ loom <- R6Class(
       }
     },
     # Datetime functions
-    timestamp = function(dataset) {
+    timestamp = function(x) {
       if (self$mode == 'r') {
         stop(private$err_mode)
       }
@@ -1337,21 +1349,71 @@ loom <- R6Class(
       # %OS6 -- seconds with 6 digits after the decimal
       # Z -- end time
       time <- strftime(x = Sys.time(), format = '%Y%m%dT%H%M%OS6Z', tz = 'UTC')
-      h5attr(x = self[[dataset]], which = 'last_modified') <- time
+      if (!all(sapply(X = x, FUN = self$exists))) {
+        stop("Cannot find all groups/datasets passed")
+      }
+      h5attr(x = self, which = 'last_modified') <- time
+      for (i in x) {
+        h5attr(x = self[[i]], which = 'last_modified') <- time
+      }
       invisible(x = self)
     },
-    last.modified = function(...) {
-      time <- unlist(x = strsplit(x = '', split = '.', fixed = TRUE))[1]
-      if (substr(x = time, start = nchar(x = time), stop = nchar(x = time)) != 'Z') {
-        time <- paste0(time, 'Z')
+    last.modified = function(x = 'self') {
+      if (is.null(x = x)) {
+        x <- c(
+          'self',
+          list.datasets(
+            object = self,
+            path = '/',
+            full.names = FALSE,
+            recursive = TRUE
+          ),
+          list.groups(
+            object = self,
+            path = '/',
+            full.names = FALSE,
+            recursive = TRUE
+          )
+        )
       }
-      time <- as.POSIXct(x = strptime(
-        x = time,
-        format = '%Y%m%dT%H%M%SZ',
-        tz = 'UTC'
-      ))
-      time <- format(x = time, tz = Sys.timezone(), usetz = TRUE)
-      return(time)
+      if (!all(x == 'self' | sapply(X = x, FUN = self$exists))) {
+        stop("Cannot find all groups/datasets passed")
+      }
+      timestamps <- lapply(
+        X = x,
+        FUN = function(i) {
+          time <- if (i == 'self') {
+            tryCatch(
+              expr = h5attr(x = self, which = 'last_modified'),
+              error = function(e) {
+                return(NULL)
+              }
+            )
+          } else {
+            tryCatch(
+              expr = h5attr(x = self[[i]], which = 'last_modified'),
+              error = function(e) {
+                return(NULL)
+              }
+            )
+          }
+          if (!is.null(x = time)) {
+            time <- unlist(x = strsplit(x = time, split = '.', fixed = TRUE))[1]
+            if (substr(x = time, start = nchar(x = time), stop = nchar(x = time)) != 'Z') {
+              time <- paste0(time, 'Z')
+            }
+            time <- as.POSIXct(x = strptime(
+              x = time,
+              format = '%Y%m%dT%H%M%SZ',
+              tz = 'UTC'
+            ))
+            time <- format(x = time, tz = Sys.timezone(), usetz = TRUE)
+          }
+          return(time)
+        }
+      )
+      names(x = timestamps) <- x
+      return(Filter(f = Negate(f = is.null), x = timestamps))
     }
   ),
   # Private fields and methods
@@ -1362,6 +1424,7 @@ loom <- R6Class(
   # @field iter.margin Margin to iterate over
   # @field iter.index Index values for iteration
   # @field skipped.validation Was validation skipped?
+  # @section Methods:
   # \describe{
   #   \item{\code{load_attributes(MARGIN)}}{Load attributes of a given MARGIN into \code{self$col.attrs} or \code{self$row.attrs}}
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
