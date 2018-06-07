@@ -151,17 +151,15 @@ NULL
 #'       \item{\code{...}}{Ignored for now}
 #'     }
 #'   }
-#'   \item{\code{timestamp(x)}}{
-#'     Timestamp a loom object (group or dataset)
-#'     \describe{
-#'       \item{\code{x}}{A character vector of groups or datasets to timestamp}
-#'     }
-#'   }
 #'   \item{\code{last.modified(x = 'self')}}{
 #'     Get the time an object (group, dataset, file) was most recently modified
 #'     \describe{
 #'       \item{\code{x}}{A character vector of groups or datasets to get the timestamp of, defaults to 'self' or the file as a whole; pass \code{NULL} to get all timestamps present}
 #'     }
+#'   }
+#'   \item{\code{get.changes.since(x)}}{
+#'     Get changes since a given time
+#'     \item{\code{x}}{An object of class \code{POSIXct}}
 #'   }
 #' }
 #'
@@ -1088,6 +1086,8 @@ loom <- R6Class(
       if (display.progress) {
         close(con = pb)
       }
+      # Update timestamp
+      # private$timestamp(x = )
       # Clean up and allow chaining
       private$reset_batch()
       # Load layers and attributes
@@ -1335,29 +1335,6 @@ loom <- R6Class(
       }
     },
     # Datetime functions
-    timestamp = function(x) {
-      if (self$mode == 'r') {
-        stop(private$err_mode)
-      }
-      # Timestamp format, always in UTC
-      # %Y -- four-digit year
-      # %m -- two-digit month
-      # %d -- two-digit day
-      # T -- sepearte date from time
-      # %H -- 24-hour time
-      # %M -- two-digit minute
-      # %OS6 -- seconds with 6 digits after the decimal
-      # Z -- end time
-      time <- strftime(x = Sys.time(), format = '%Y%m%dT%H%M%OS6Z', tz = 'UTC')
-      if (!all(sapply(X = x, FUN = self$exists))) {
-        stop("Cannot find all groups/datasets passed")
-      }
-      h5attr(x = self, which = 'last_modified') <- time
-      for (i in x) {
-        h5attr(x = self[[i]], which = 'last_modified') <- time
-      }
-      invisible(x = self)
-    },
     last.modified = function(x = 'self') {
       if (is.null(x = x)) {
         x <- c(
@@ -1414,6 +1391,13 @@ loom <- R6Class(
       )
       names(x = timestamps) <- x
       return(Filter(f = Negate(f = is.null), x = timestamps))
+    },
+    get.changes.since = function(ts) {
+      if (!inherits(x = ts, what = 'POSIXct')) {
+        stop("'timestamp', must be of class POSIXct")
+      }
+      all.timestamps <- as.POSIXct(x = self$last.modified(x = NULL))
+      return(all.timestamps[all.timestamps >= ts])
     }
   ),
   # Private fields and methods
@@ -1430,6 +1414,7 @@ loom <- R6Class(
   #   \item{\code{load_layers()}}{Load layers into \code{self$layers}}
   #   \item{\code{reset_batch()}}{Reset the batch iterator fields}
   #   \item{\code{iter_range(index.use)}}{Get the range of indices for a batch iteration}
+  #   \item{\code{timestamp(x, silent = FALSE)}}{Timestamp a group or dataset, will modify timestamps recursively}
   # }
   private = list(
     # Fields
@@ -1521,6 +1506,51 @@ loom <- R6Class(
         ))
       }
       return(index.use)
+    },
+    timestamp = function(x, silent = FALSE) {
+      # Check read-only mode
+      if (self$mode == 'r') {
+        if (silent) {
+          invisible(x = NULL)
+        } else {
+          stop(private$err_mode)
+        }
+      }
+      # Timestamp format, always in UTC
+      # %Y -- four-digit year
+      # %m -- two-digit month
+      # %d -- two-digit day
+      # T -- sepearte date from time
+      # %H -- 24-hour time
+      # %M -- two-digit minute
+      # %OS6 -- seconds with 6 digits after the decimal
+      # Z -- end time
+      # Generate time
+      time <- strftime(x = Sys.time(), format = '%Y%m%dT%H%M%OS6Z', tz = 'UTC')
+      # Ensure all groups and datasets exist
+      if (!all(sapply(X = x, FUN = self$exists))) {
+        stop("Cannot find all groups/datasets passed")
+      }
+      # Find all groups containing passed groups/datasets
+      x <- strsplit(x = x, split = '/')
+      x <- lapply(
+        X = x,
+        FUN = function(split.name) {
+          split.name <- Filter(f = nchar, x = split.name)
+          combinations <- vector(mode = 'character', length = length(x = split.name))
+          for (i in 1:length(x = split.name)) {
+            combinations[i] <- paste(split.name[1:i], collapse = '/')
+          }
+          return(combinations)
+        }
+      )
+      x <- unique(x = unlist(x = x))
+      # Add timestamp
+      h5attr(x = self, which = 'last_modified') <- time
+      for (i in x) {
+        h5attr(x = self[[i]], which = 'last_modified') <- time
+      }
+      invisible(x = self)
     }
   )
 )

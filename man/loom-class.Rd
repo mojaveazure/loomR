@@ -159,17 +159,15 @@ A class for connections loom files
       \item{\code{...}}{Ignored for now}
     }
   }
-  \item{\code{timestamp(x)}}{
-    Timestamp a loom object (group or dataset)
-    \describe{
-      \item{\code{x}}{A character vector of groups or datasets to timestamp}
-    }
-  }
   \item{\code{last.modified(x = 'self')}}{
     Get the time an object (group, dataset, file) was most recently modified
     \describe{
       \item{\code{x}}{A character vector of groups or datasets to get the timestamp of, defaults to 'self' or the file as a whole; pass \code{NULL} to get all timestamps present}
     }
+  }
+  \item{\code{get.changes.since(x)}}{
+    Get changes since a given time
+    \item{\code{x}}{An object of class \code{POSIXct}}
   }
 }
 }
