@@ -1640,6 +1640,7 @@ create <- function(
     )
     gc(verbose = FALSE)
   }
+  chunk.dims <- as.integer(x = chunk.dims)
   chunk.dims <- pmin(chunk.dims, matrix.shape)
   new.loom$create_dataset(
     name = 'matrix',
