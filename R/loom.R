@@ -518,6 +518,7 @@ loom <- R6Class(
       gc(verbose = FALSE)
       # Load the attributes for this margin
       private$load_attributes(MARGIN = MARGIN)
+      private$timestamp(x = names(x = attribute))
       invisible(x = self)
     },
     add.row.attribute = function(attribute, overwrite = FALSE) {
@@ -2052,10 +2053,11 @@ combine <- function(
   if (length(x = looms) < 2) {
     stop("Need at least two loom objects or files to merge")
   }
-  length.check <- unique(x = vapply(X = looms, FUN = length, FUN.VALUE = integer(length = 1L)))
-  if (length(x = length.check) != 1 || length.check != 1) {
-    stop("Each entry in the list of looms to combine must have a length of one")
-  }
+  looms <- unlist(x = looms, recursive = TRUE, use.names = FALSE)
+  # length.check <- unique(x = vapply(X = looms, FUN = length, FUN.VALUE = integer(length = 1L)))
+  # if (length(x = length.check) != 1 || length.check != 1) {
+  #   stop("Each entry in the list of looms to combine must have a length of one")
+  # }
   # Ensure order.by comes from row_attrs
   if (!is.null(x = order.by) && dirname(path = order.by) != 'row_attrs') {
     order.by <- paste('row_attrs', order.by, sep = '/')
