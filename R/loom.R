@@ -2187,7 +2187,8 @@ combine <- function(
     nrows[i] <- this[['matrix']]$dims[2]
     ncols[i] <- this[['matrix']]$dims[1]
     matrix.type[[i]] <- class(x = this[['matrix']]$get_type())[1]
-    loom.chunk.dims[[i]] <- as.numeric(strsplit(h5attr(this, 'chunks'), split = '[\\(, \\)]+')[[1]][2:3])
+    # loom.chunk.dims[[i]] <- as.numeric(strsplit(h5attr(this, 'chunks'), split = '[\\(, \\)]+')[[1]][2:3])
+    loom.chunk.dims[[i]] <- lfile[['matrix']]$chunk_dims
     if (is.character(x = looms[[i]])) {
       this$close_all()
     }
