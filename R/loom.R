@@ -159,7 +159,9 @@ NULL
 #'   }
 #'   \item{\code{get.changes.since(x)}}{
 #'     Get changes since a given time
-#'     \item{\code{x}}{An object of class \code{POSIXct}}
+#'     \describe{
+#'       \item{\code{x}}{An object of class \code{POSIXct}}
+#'     }
 #'   }
 #' }
 #'
@@ -1364,14 +1366,24 @@ loom <- R6Class(
             tryCatch(
               expr = h5attr(x = self, which = 'last_modified'),
               error = function(e) {
-                return(NULL)
+                if (self$mode != 'r') {
+                  private$timestamp(x = NULL)
+                  return(h5attr(x = self, which = 'last_modified'))
+                } else {
+                  return(NULL)
+                }
               }
             )
           } else {
             tryCatch(
               expr = h5attr(x = self[[i]], which = 'last_modified'),
               error = function(e) {
-                return(NULL)
+                if (self$mode != 'r') {
+                  private$timestamp(x = i)
+                  return(h5attr(x = self, which = 'last_modified'))
+                } else {
+                  return(NULL)
+                }
               }
             )
           }
@@ -1508,7 +1520,7 @@ loom <- R6Class(
       }
       return(index.use)
     },
-    timestamp = function(x, silent = FALSE) {
+    timestamp = function(x = NULL, silent = FALSE) {
       # Check read-only mode
       if (self$mode == 'r') {
         if (silent) {
@@ -1528,30 +1540,31 @@ loom <- R6Class(
       # Z -- end time
       # Generate time
       time <- strftime(x = Sys.time(), format = '%Y%m%dT%H%M%OS6Z', tz = 'UTC')
-      # Ensure all groups and datasets exist
-      if (!all(sapply(X = x, FUN = self$exists))) {
-        stop("Cannot find all groups/datasets passed")
-      }
-      # Find all groups containing passed groups/datasets
-      x <- strsplit(x = x, split = '/')
-      x <- lapply(
-        X = x,
-        FUN = function(split.name) {
-          split.name <- Filter(f = nchar, x = split.name)
-          combinations <- vector(mode = 'character', length = length(x = split.name))
-          for (i in 1:length(x = split.name)) {
-            combinations[i] <- paste(split.name[1:i], collapse = '/')
-          }
-          return(combinations)
+      if (!is.null(x = x)) {
+        # Ensure all groups and datasets exist
+        if (!all(sapply(X = x, FUN = self$exists))) {
+          stop("Cannot find all groups/datasets passed")
         }
-      )
-      x <- unique(x = unlist(x = x))
+        # Find all groups containing passed groups/datasets
+        x <- strsplit(x = x, split = '/')
+        x <- lapply(
+          X = x,
+          FUN = function(split.name) {
+            split.name <- Filter(f = nchar, x = split.name)
+            combinations <- vector(mode = 'character', length = length(x = split.name))
+            for (i in 1:length(x = split.name)) {
+              combinations[i] <- paste(split.name[1:i], collapse = '/')
+            }
+            return(combinations)
+          }
+        )
+        x <- unique(x = unlist(x = x))
+      }
       # Add timestamp
       h5attr(x = self, which = 'last_modified') <- time
       for (i in x) {
         h5attr(x = self[[i]], which = 'last_modified') <- time
       }
-      invisible(x = self)
     }
   )
 )
