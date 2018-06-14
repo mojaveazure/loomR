@@ -1,6 +1,7 @@
 #' @include internal.R
 #' @import hdf5r
 #' @import Matrix
+#' @import pbapply
 #' @importFrom R6 R6Class
 NULL
 
@@ -937,9 +938,6 @@ loom <- R6Class(
       # Trial to get class of new dataset
       # Do a trial run to figure out the class of dataset
       na.use <- NA
-      # if (display.progress) {
-      #   catn("Running trial to determine class of dataset")
-      # }
       trial.use <- if (is.null(x = index.use)) {
         sample(x = 1:self$shape[MARGIN], size = 3, replace = FALSE)
       } else {
@@ -1092,7 +1090,7 @@ loom <- R6Class(
         close(con = pb)
       }
       # Update timestamp
-      private$timestamp(x = name)
+      private$timestamp(x = file.path(results.dirname, results.basename))
       # Clean up and allow chaining
       private$reset_batch()
       # Load layers and attributes
