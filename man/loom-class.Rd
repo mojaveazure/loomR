@@ -167,7 +167,9 @@ A class for connections loom files
   }
   \item{\code{get.changes.since(x)}}{
     Get changes since a given time
-    \item{\code{x}}{An object of class \code{POSIXct}}
+    \describe{
+      \item{\code{x}}{An object of class \code{POSIXct}}
+    }
   }
 }
 }
