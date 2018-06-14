@@ -311,6 +311,7 @@ loom <- R6Class(
       self[[group]][[name]][['a']] <- a
       self[[group]][[name]][['b']] <- b
       self[[group]][[name]][['w']] <- w
+      private$timestamp(x = file.path(group, name))
       invisible(x = self)
     },
     add.graph.matrix = function(mat, name, MARGIN = 2, overwrite = FALSE) {
@@ -447,6 +448,7 @@ loom <- R6Class(
       }
       self$flush()
       gc(verbose = FALSE)
+      private$timestamp(x = file.path('layers', names(x = layers)))
       private$load_layers()
       invisible(x = self)
     },
@@ -520,7 +522,7 @@ loom <- R6Class(
       gc(verbose = FALSE)
       # Load the attributes for this margin
       private$load_attributes(MARGIN = MARGIN)
-      private$timestamp(x = names(x = attribute))
+      private$timestamp(x = file.path(grp.name, names(x = attribute)))
       invisible(x = self)
     },
     add.row.attribute = function(attribute, overwrite = FALSE) {
@@ -1090,7 +1092,7 @@ loom <- R6Class(
         close(con = pb)
       }
       # Update timestamp
-      # private$timestamp(x = )
+      private$timestamp(x = name)
       # Clean up and allow chaining
       private$reset_batch()
       # Load layers and attributes
