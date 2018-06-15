@@ -75,8 +75,8 @@ NULL
 #'       }
 #'     }
 #'   }
-#'   \item{\code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
-#'     Generate indices of chunk size \code{chunk.size} for iteration
+#'   \item{\code{chunk.pints(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+#'     Generate start/end points or indices of chunk size \code{chunk.size} for iteration
 #'     \describe{
 #'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}
 #'       \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
