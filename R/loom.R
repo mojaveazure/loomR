@@ -1,7 +1,6 @@
 #' @include internal.R
 #' @import hdf5r
 #' @import Matrix
-#' @import pbapply
 #' @importFrom R6 R6Class
 NULL
 
@@ -167,6 +166,7 @@ NULL
 #' }
 #'
 #' @importFrom iterators nextElem
+#' @importFrom pbapply pbapply pbsapply
 #' @importFrom itertools hasNext ihasNext ichunk
 #' @importFrom utils packageVersion setTxtProgressBar
 #'
@@ -693,7 +693,7 @@ loom <- R6Class(
       }
     },
     # Chunking functions
-    chunk.indices = function(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix') {
+    chunk.points = function(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix') {
       if (!self$exists(name = dataset.use)) {
         dataset.use <- grep(
           pattern = dataset.use,
@@ -727,15 +727,19 @@ loom <- R6Class(
         chunk.size = chunk.size
       )
       return(chunk.points)
-      # chunk.indices <- apply(
-      #   X = chunk.points,
-      #   MARGIN = 2,
-      #   FUN = function(x) {
-      #     return(x[1]:x[2])
-      #   }
-      # )
-      # private$iter.scan <- function()
-      # return(chunk.indices)
+    },
+    chunk.indices = function(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix') {
+      return(apply(
+        X = self$chunk.points(
+          chunk.size = chunk.size,
+          MARGIN = MARGIN,
+          dataset.use = dataset.use
+        ),
+        MARGIN = 2,
+        FUN = function(x) {
+          return(x[1]:x[2])
+        }
+      ))
     },
     scan = function(
       check = FALSE,
@@ -880,22 +884,6 @@ loom <- R6Class(
           stop(paste("A dataset with the name", name, "already exists!"))
         }
       }
-      # Checks datset, index, and MARGIN
-      # Sets full dataset path in private$iter.dataset
-      # Sets proper MARGIN in private$iter.margin
-      chunk.points <- self$chunk.indices(
-        chunk.size = chunk.size,
-        MARGIN = MARGIN,
-        dataset.use = dataset.use
-      )
-      # batch <- self$batch.scan(
-      #   chunk.size = chunk.size,
-      #   MARGIN = MARGIN,
-      #   dataset.use = dataset.use,
-      #   force.reset = TRUE
-      # )
-      # MARGIN <- private$iter.margin
-      # dataset.use <- private$iter.dataset
       # Ensure that our group name is allowed
       name.check <- which(x = dirnames == results.dirname)
       if (!any(name.check)) {
@@ -907,7 +895,7 @@ loom <- R6Class(
       }
       # Check that our group matches our iteration
       # ie. To store in col_attrs, MARGIN must be 1
-      if (name.check %in% c(1, 2) && name.check != private$iter.margin) {
+      if (name.check %in% c(1, 2) && name.check != MARGIN) {
         private$reset_batch()
         stop(paste(
           "Iteration must be over",
@@ -1008,87 +996,91 @@ loom <- R6Class(
         name = results.basename,
         dtype = dtype.use,
         space = results.space,
-        chunk_dims = chunk.dims,
+        chunk_dims = as.integer(x = chunk.dims),
         gzip_level = 4
       )
       chunk.size = chunk.dims[1]
+      chunk.points <- self$chunk.points(
+        chunk.size = chunk.size,
+        MARGIN = MARGIN,
+        dataset.use = dataset.use
+      )
       # Start the iteration
       if (display.progress) {
         catn("Writing results to", name)
-        pb <- newPB()
+        myapply <- pbapply
+      } else {
+        myapply <- apply
       }
-      # first <- TRUE
-      # for (i in 1:length(x = batch)) {
-      for (i in 1:ncol(x = chunk.points)) {
-        # Get the indices we're iterating over
-        # chunk.indices <- self$batch.next(return.data = FALSE)
-        start <- chunk.points[1, i]
-        end <- chunk.points[2, i]
-        chunk.indices <- start:end
-        indices.use <- chunk.indices[chunk.indices %in% index.use]
-        indices.use <- indices.use - chunk.indices[1] + 1
-        if (length(x = indices.use) < 1) {
-          if (display.progress) {
-            setTxtProgressBar(pb = pb, value = i / ncol(x = chunk.points))
+      unique(x = myapply(
+        X = chunk.points,
+        MARGIN = 2,
+        FUN = function(points, ...) {
+          # Get the indices we're iterating over
+          start <- points[1]
+          end <- points[2]
+          chunk.indices <- start:end
+          indices.use <- chunk.indices[chunk.indices %in% index.use]
+          indices.use <- indices.use - chunk.indices[1] + 1
+          if (length(x = indices.use) < 1) {
+            next
           }
-          next
-        }
-        # Get the data and apply FUN
-        chunk.data <- if (dataset.matrix) {
-          switch(
-            EXPR = MARGIN,
-            '1' = {
-              # Chunk genes
-              x <- self[[dataset.use]][, chunk.indices]
-              x[, indices.use]
-            },
-            '2' = {
-              # Chunk cells
-              x <- self[[dataset.use]][chunk.indices, ]
-              x[indices.use, ]
-            }
-          )
-        } else {
-          x <- self[[private$iter.datset]][chunk.indices]
-          x[indices.use]
-        }
-        chunk.data <- FUN(chunk.data, ...)
-        if (results.matrix) {
-          # If we're writign to a matrix
-          # Figure out which way we're writing the data
-          switch(
-            EXPR = MARGIN,
-            '1' = {
-              chunk.full <- matrix(
-                nrow = nrow(x = chunk.data),
-                ncol = length(x = chunk.indices)
-              )
-              chunk.full[, indices.use] <- chunk.data
-              group[[results.basename]][, chunk.indices] <- chunk.full
-            },
-            '2' = {
-              chunk.full <- matrix(
-                nrow = length(x = chunk.indices),
-                ncol = ncol(x = chunk.data)
-              )
-              chunk.full[indices.use, ] <- chunk.data
-              group[[results.basename]][chunk.indices, ] <- chunk.full
-            }
-          )
-        } else {
-          # Just write to the vector
-          chunk.full <- vector(length = length(x = chunk.indices))
-          chunk.full[indices.use] <- chunk.data
-          group[[results.basename]][chunk.indices] <- chunk.full
-        }
-        gc(verbose = FALSE)
-        if (display.progress) {
-          setTxtProgressBar(pb = pb, value = i / ncol(x = chunk.points))
-        }
-      }
-      if (display.progress) {
-        close(con = pb)
-      }
+          # Get the data and apply FUN
+          chunk.data <- if (dataset.matrix) {
+            switch(
+              EXPR = MARGIN,
+              '1' = {
+                # Chunk genes
+                x <- self[[dataset.use]][, chunk.indices]
+                x[, indices.use]
+              },
+              '2' = {
+                # Chunk cells
+                x <- self[[dataset.use]][chunk.indices, ]
+                x[indices.use, ]
+              }
+            )
+          } else {
+            x <- self[[private$iter.datset]][chunk.indices]
+            x[indices.use]
+          }
+          chunk.data <- FUN(chunk.data, ...)
+          if (results.matrix) {
+            # If we're writign to a matrix
+            # Figure out which way we're writing the data
+            switch(
+              EXPR = MARGIN,
+              '1' = {
+                chunk.full <- matrix(
+                  nrow = nrow(x = chunk.data),
+                  ncol = length(x = chunk.indices)
+                )
+                chunk.full[, indices.use] <- chunk.data
+                group[[results.basename]][, chunk.indices] <- chunk.full
+                # group[[results.use]][, chunk.indices] <- chunk.full
+              },
+              '2' = {
+                chunk.full <- matrix(
+                  nrow = length(x = chunk.indices),
+                  ncol = ncol(x = chunk.data)
+                )
+                chunk.full[indices.use, ] <- chunk.data
+                group[[results.basename]][chunk.indices, ] <- chunk.full
+                # group[[results.use]][chunk.indices, ] <- chunk.full
+              }
+            )
+          } else {
+            # Just write to the vector
+            chunk.full <- vector(length = length(x = chunk.indices))
+            chunk.full[indices.use] <- chunk.data
+            group[[results.basename]][chunk.indices] <- chunk.full
+            # group[[results.use]][chunk.indices] <- chunk.full
+          }
+          gc(verbose = FALSE)
+          return(NULL)
+        },
+        ...
+      ))
       # Update timestamp
       private$timestamp(x = file.path(results.dirname, results.basename))
       # Clean up and allow chaining
@@ -1111,17 +1103,6 @@ loom <- R6Class(
       if (!inherits(x = FUN, what = 'function')) {
         stop("FUN must be a function")
       }
-      # Checks datset and MARGIN
-      # Sets full dataset path in private$iter.dataset
-      # Sets proper MARGIN in private$iter.margin
-      batch <- self$batch.scan(
-        chunk.size = chunk.size,
-        MARGIN = MARGIN,
-        dataset.use = dataset.use,
-        force.reset = TRUE
-      )
-      MARGIN <- private$iter.margin
-      dataset.use <- private$iter.dataset
       # Check how we store our results
       # And what the shape of our dataset is
       dataset.matrix <- any(vapply(
@@ -1130,6 +1111,11 @@ loom <- R6Class(
         FUN.VALUE = logical(length = 1L),
         x = dataset.use
       ))
+      chunk.points <- self$chunk.points(
+        chunk.size = chunk.size,
+        MARGIN = MARGIN,
+        dataset.use = dataset.use
+      )
       # Ensure that index.use is integers within the bounds of [1, self$shape[MARGIN]]
       if (is.null(x = index.use)) {
         index.use <- 1L:self$shape[MARGIN]
@@ -1146,54 +1132,51 @@ loom <- R6Class(
         }
       }
       # Create our results holding object
-      results <- vector(mode = "list", length = length(x = batch))
-      if (display.progress) {
-        pb <- newPB()
-      }
-      for (i in 1:length(x = batch)) {
-        # Get the indices we're iterating over
-        chunk.indices <- self$batch.next(return.data = FALSE)
-        indices.use <- chunk.indices[chunk.indices %in% index.use]
-        indices.use <- indices.use - chunk.indices[1] + 1
-        if (length(x = indices.use) < 1) {
-          if (display.progress) {
-            setTxtProgressBar(pb = pb, value = i / length(x = batch))
+      # results <- vector(mode = "list", length = length(x = batch))
+      results <- vector(mode = 'list', length = ncol(x = chunk.points))
+      myapply <- ifelse(test = display.progress, yes = pbsapply, no = sapply)
+      unique(x = myapply(
+        X = 1:ncol(x = chunk.points),
+        FUN = function(i, ...) {
+          # Get the indices we're iterating over
+          start <- chunk.points[1, i]
+          end <- chunk.points[2, i]
+          chunk.indices <- start:end
+          indices.use <- chunk.indices[chunk.indices %in% index.use]
+          indices.use <- indices.use - chunk.indices[1] + 1
+          if (length(x = indices.use) < 1) {
+            next
           }
-          next
-        }
-        # Get the data and apply FUN
-        chunk.data <- if (dataset.matrix) {
-          switch(
-            EXPR = MARGIN,
-            '1' = {
-              # Chunk genes
-              x <- self[[dataset.use]][, chunk.indices]
-              x[, indices.use]
-            },
-            '2' = {
-              # Chunk cells
-              x <- self[[dataset.use]][chunk.indices, ]
-              x[indices.use, ]
-            }
-          )
-        } else {
-          x <- self[[private$iter.datset]][chunk.indices]
-          x[indices.use]
-        }
-        results[[i]] <- FUN(chunk.data, ...)
-        if (display.progress) {
-          setTxtProgressBar(pb = pb, value = i / length(x = batch))
-        }
-      }
+          # Get the data and apply FUN
+          chunk.data <- if (dataset.matrix) {
+            switch(
+              EXPR = MARGIN,
+              '1' = {
+                # Chunk genes
+                x <- self[[dataset.use]][, chunk.indices]
+                x[, indices.use]
+              },
+              '2' = {
+                # Chunk cells
+                x <- self[[dataset.use]][chunk.indices, ]
+                x[indices.use, ]
+              }
+            )
+          } else {
+            x <- self[[dataset.use]][chunk.indices]
+            x[indices.use]
+          }
+          results[[i]] <<- FUN(chunk.data, ...)
+          return(NULL)
+        },
+        ...
+      ))
       # Bring result list into matrix or vector format
       if (inherits(x = results[[1]], what = c('matrix', 'Matrix', 'data.frame'))) {
         reduce.func <- switch(EXPR = MARGIN, '1' = cbind, '2' = rbind)
         results <- Reduce(f = reduce.func, x = results)
       } else {
         results <- unlist(x = results, use.names = FALSE)
-      }
-      if (display.progress) {
-        close(con = pb)
       }
       private$reset_batch()
       return(results)
