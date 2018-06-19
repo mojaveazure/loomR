@@ -83,7 +83,17 @@ A class for connections loom files
       }
     }
   }
-  \item{\code{chunk.pints(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+  \item{\code(get.sparse(dataset.use, genes.use, cells.use, chunk.size, display.progress)}{
+    Get a sparse matrix representation of a dataset
+    \describe{
+      \item{\code{dataset.use}}{...}
+      \item{\code{genes.use}}{...}
+      \item{\code{cells.use}}{...}
+      \item{\code{chunk.size}}{...}
+      \item{\code{display.progress}}{Display a progress bar}
+    }
+  }
+  \item{\code{chunk.points(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
     Generate start/end points or indices of chunk size \code{chunk.size} for iteration
     \describe{
       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}

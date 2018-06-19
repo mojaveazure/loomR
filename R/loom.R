@@ -75,7 +75,17 @@ NULL
 #'       }
 #'     }
 #'   }
-#'   \item{\code{chunk.pints(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+#'   \item{\code(get.sparse(dataset.use, genes.use, cells.use, chunk.size, display.progress)}{
+#'     Get a sparse matrix representation of a dataset
+#'     \describe{
+#'       \item{\code{dataset.use}}{...}
+#'       \item{\code{genes.use}}{...}
+#'       \item{\code{cells.use}}{...}
+#'       \item{\code{chunk.size}}{...}
+#'       \item{\code{display.progress}}{Display a progress bar}
+#'     }
+#'   }
+#'   \item{\code{chunk.points(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
 #'     Generate start/end points or indices of chunk size \code{chunk.size} for iteration
 #'     \describe{
 #'       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}
@@ -642,13 +652,12 @@ loom <- R6Class(
       return(graph)
     },
     get.sparse = function(
-      name,
+      dataset.use,
       genes.use = NULL,
       cells.use = NULL,
       chunk.size = 1000,
       display.progress = TRUE
     ) {
-      return(NULL)
       self$update.shape()
       genes.use <- if (is.null(x = genes.use)) {
         1L:self$shape[1]
@@ -664,33 +673,48 @@ loom <- R6Class(
         '/matrix',
         list.datasets(object = self, path = '/layers', full.names = TRUE)
       )
-      dataset.use <- grep(pattern = name, x = datasets.avail, value = TRUE)
+      dataset.use <- grep(pattern = dataset.use, x = datasets.avail, value = TRUE)
       if (length(x = dataset.use) < 1) {
         stop("find")
       } else if (length(x = dataset.use) > 1) {
         stop(private$err_ambiguous)
       }
-      data.return <- Matrix(
-        data = vector(mode = class(x = self[[dataset.use]]$get_fill_value()), length = 1L),
-        # nrow = self$shape[1],
-        nrow = length(x = genes.use),
-        # ncol = self$shape[2],
-        ncol = length(x = cells.use),
-        sparse = TRUE
-      )
-      if (display.progress) {
-        catn("Reading in", dataset.use, "as a sparse matrix")
-        pb <- newPB()
-      }
-      batch <- self$batch.scan(
+      chunk.points <- self$chunk.points(
         chunk.size = chunk.size,
         MARGIN = 2,
-        dataset.use = dataset.use,
-        force.reset = TRUE
+        dataset.use = dataset.use
       )
-      for (i in 1L:length(x = batch)) {
-        chunk.indices <-self$batch.next(return.data = FALSE)
-      }
+      myapply <- ifelse(test = display.progress, yes = pbapply, no = apply)
+      i <- vector(mode = 'integer')
+      p <- vector(mode = 'integer', length = 1L)
+      dat <- myapply(
+        X = chunk.points,
+        MARGIN = 2,
+        FUN = function(points) {
+          chunk.indices <- points[1]:points[2]
+          indices.use <- chunk.indices[chunk.indices %in% cells.use]
+          indices.use <- indices.use - chunk.indices[1] + 1
+          if (length(x = indices.use) < 1) {
+            return(NULL)
+          }
+          chunk.data <- t(x = self[[dataset.use]][chunk.indices, ][indices.use, genes.use])
+          i.chunk <- apply(
+            X = chunk.data,
+            MARGIN = 2,
+            FUN = function(row) {
+              return(which(x = row != 0))
+            }
+          )
+          p.chunk <- vapply(X = i.chunk, FUN = length, FUN.VALUE = integer(length = 1L))
+          names(x = p.chunk) <- names(x = i.chunk) <- NULL
+          i <<- c(i, unlist(x = i.chunk))
+          p <<- c(p, max(p) + cumsum(x = p.chunk))
+          return(chunk.data[chunk.data != 0])
+        }
+      )
+      data.return <- sparseMatrix(i = i, p = p, x = unlist(x = dat))
+      # TODO: dimnames for data.return
+      return(data.return)
     },
     # Chunking functions
     chunk.points = function(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix') {
