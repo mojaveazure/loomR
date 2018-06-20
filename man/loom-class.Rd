@@ -83,13 +83,15 @@ A class for connections loom files
       }
     }
   }
-  \item{\code(get.sparse(dataset.use, genes.use, cells.use, chunk.size, display.progress)}{
+  \item{\code{get.sparse(dataset.use, genes.use, cells.use, chunk.size, gene.names, cell.names, display.progress)}}{
     Get a sparse matrix representation of a dataset
     \describe{
-      \item{\code{dataset.use}}{...}
-      \item{\code{genes.use}}{...}
-      \item{\code{cells.use}}{...}
-      \item{\code{chunk.size}}{...}
+      \item{\code{dataset.use}}{Dataset to be returned as a sparse matrix}
+      \item{\code{genes.use}}{Vector of indices of genes to return}
+      \item{\code{cells.use}}{Vector of indices of cells to return}
+      \item{\code{chunk.size}}{Number of cells to iterate through at a time}
+      \item{\code{gene.names}}{Dataset to gene names}
+      \item{\code{cell.names}}{Dataset to cell names}
       \item{\code{display.progress}}{Display a progress bar}
     }
   }

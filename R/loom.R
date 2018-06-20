@@ -75,13 +75,15 @@ NULL
 #'       }
 #'     }
 #'   }
-#'   \item{\code(get.sparse(dataset.use, genes.use, cells.use, chunk.size, display.progress)}{
+#'   \item{\code{get.sparse(dataset.use, genes.use, cells.use, chunk.size, gene.names, cell.names, display.progress)}}{
 #'     Get a sparse matrix representation of a dataset
 #'     \describe{
-#'       \item{\code{dataset.use}}{...}
-#'       \item{\code{genes.use}}{...}
-#'       \item{\code{cells.use}}{...}
-#'       \item{\code{chunk.size}}{...}
+#'       \item{\code{dataset.use}}{Dataset to be returned as a sparse matrix}
+#'       \item{\code{genes.use}}{Vector of indices of genes to return}
+#'       \item{\code{cells.use}}{Vector of indices of cells to return}
+#'       \item{\code{chunk.size}}{Number of cells to iterate through at a time}
+#'       \item{\code{gene.names}}{Dataset to gene names}
+#'       \item{\code{cell.names}}{Dataset to cell names}
 #'       \item{\code{display.progress}}{Display a progress bar}
 #'     }
 #'   }
@@ -548,7 +550,7 @@ loom <- R6Class(
       self$add.col.attribute(attribute = meta.data, overwrite = overwrite)
       invisible(x = self)
     },
-    # Get attribute information
+    # Get data from the loom file
     get.attribute.df = function(
       MARGIN = 2,
       attribute.names = NULL,
@@ -655,7 +657,9 @@ loom <- R6Class(
       dataset.use,
       genes.use = NULL,
       cells.use = NULL,
-      chunk.size = 1000,
+      chunk.size = NULL,
+      gene.names = NULL,
+      cell.names = NULL,
       display.progress = TRUE
     ) {
       self$update.shape()
@@ -675,10 +679,15 @@ loom <- R6Class(
       )
       dataset.use <- grep(pattern = dataset.use, x = datasets.avail, value = TRUE)
       if (length(x = dataset.use) < 1) {
-        stop("find")
+        stop("Cannot find request dataset, 'get.sparse' only works for '/matrix' and datasets in '/layers'")
       } else if (length(x = dataset.use) > 1) {
         stop(private$err_ambiguous)
       }
+      chunk.size <- ifelse(
+        test = is.null(x = chunk.size),
+        yes = self[[dataset.use]]$chunk_dims[1],
+        no = chunk.size
+      )
       chunk.points <- self$chunk.points(
         chunk.size = chunk.size,
         MARGIN = 2,
@@ -709,11 +718,46 @@ loom <- R6Class(
           names(x = p.chunk) <- names(x = i.chunk) <- NULL
           i <<- c(i, unlist(x = i.chunk))
           p <<- c(p, max(p) + cumsum(x = p.chunk))
+          gc(verbose = FALSE)
           return(chunk.data[chunk.data != 0])
         }
       )
-      data.return <- sparseMatrix(i = i, p = p, x = unlist(x = dat))
-      # TODO: dimnames for data.return
+      dat <- as.vector(x = unlist(x = dat))
+      gc(verbose = FALSE)
+      data.return <- sparseMatrix(
+        i = i,
+        p = p,
+        x = dat,
+        dims = c(length(x = genes.use), length(x = cells.use))
+      )
+      if (!is.null(x = gene.names)) {
+        if (!self$exists(name = gene.names)) {
+          gene.names <- grep(
+            pattern = gene.names,
+            x = list.datasets(object = self, path = 'row_attrs', full.names = TRUE),
+            value = TRUE
+          )
+        }
+        if (length(x = gene.names) == 1) {
+          rownames(x = data.return) <- self[[gene.names]][genes.use]
+        } else {
+          warning("Cannot find dataset ", gene.names)
+        }
+      }
+      if (!is.null(x = cell.names)) {
+        if (!self$exists(name = cell.names)) {
+          cell.names <- grep(
+            pattern = cell.names,
+            x = list.datasets(object = self, path = 'col_attrs', full.names = TRUE),
+            value = TRUE
+          )
+        }
+        if (length(x = cell.names) == 1) {
+          colnames(x = data.return) <- self[[cell.names]][cells.use]
+        } else {
+          warning("Cannot find dataset ", gene.names)
+        }
+      }
       return(data.return)
     },
     # Chunking functions
