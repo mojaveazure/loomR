@@ -677,9 +677,13 @@ loom <- R6Class(
         '/matrix',
         list.datasets(object = self, path = '/layers', full.names = TRUE)
       )
-      dataset.use <- grep(pattern = dataset.use, x = datasets.avail, value = TRUE)
+      dataset.use <- if(self$exists(name= dataset.use)) {
+        dataset.use
+      } else {
+        grep(pattern = dataset.use, x = datasets.avail, value = TRUE)
+      }
       if (length(x = dataset.use) < 1) {
-        stop("Cannot find request dataset, 'get.sparse' only works for '/matrix' and datasets in '/layers'")
+        stop("Cannot find requested dataset, 'get.sparse' only works for '/matrix' and datasets in '/layers'")
       } else if (length(x = dataset.use) > 1) {
         stop(private$err_ambiguous)
       }
