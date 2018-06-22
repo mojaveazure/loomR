@@ -1458,7 +1458,12 @@ loom <- R6Class(
     },
     get.changes.since = function(ts) {
       if (!inherits(x = ts, what = 'POSIXct')) {
-        stop("'timestamp', must be of class POSIXct")
+        tryCatch(
+          expr = ts <- as.POSIXct(x = ts),
+          error = function(e) {
+            stop("'timestamp', must be of class POSIXct")
+          }
+        )
       }
       all.timestamps <- as.POSIXct(x = self$last.modified(x = NULL))
       return(all.timestamps[all.timestamps >= ts])
