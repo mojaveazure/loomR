@@ -845,6 +845,12 @@ loom <- R6Class(
       dataset.use = 'matrix',
       force.reset = FALSE
     ) {
+      .Deprecated(
+        new = 'loom$map',
+        package = 'loomR',
+        msg = private$deprecated,
+        old = 'loom$batch.scan'
+      )
       if (is.null(x = private$it) || !grepl(pattern = dataset.use, x = private$iter.dataset) || force.reset) {
         # Check the existence of the dataset
         private$iter.dataset <- grep(
@@ -887,6 +893,12 @@ loom <- R6Class(
       return(1:ceiling((private$iter.index[2] - private$iter.index[1]) / private$iter.chunksize))
     },
     batch.next = function(return.data = TRUE) {
+      .Deprecated(
+        new = 'loom$map',
+        package = 'loomR',
+        msg = private$deprecated,
+        old = 'loom$batch.next'
+      )
       # Ensure that we have a proper iterator
       if (!'hasNext.ihasNext' %in% suppressWarnings(expr = methods(class = class(x = private$it)))) {
         stop("Please setup the iterator with self$batch.scan")
@@ -1490,6 +1502,7 @@ loom <- R6Class(
     err_init = "This loom object has not been created with either loomR::create or loomR::connect, please use these functions to create or connect to a loom file",
     err_mode = "Cannot modify a loom file in read-only mode",
     err_ambiguous = "Cannot identify the dataset provided, found too many like it; please be more specific",
+    deprecated = "batch.scan and batch.next have been deprecated; please use map/apply instead. For generating chunks, please use loom$chunk.points or loom$chunk.indices",
     iter.scan = NULL,
     it = NULL,
     iter.chunksize = NULL,
