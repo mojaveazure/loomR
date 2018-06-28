@@ -1106,59 +1106,58 @@ loom <- R6Class(
           chunk.indices <- start:end
           indices.use <- chunk.indices[chunk.indices %in% index.use]
           indices.use <- indices.use - chunk.indices[1] + 1
-          if (length(x = indices.use) < 1) {
-            next
-          }
-          # Get the data and apply FUN
-          chunk.data <- if (dataset.matrix) {
-            switch(
-              EXPR = MARGIN,
-              '1' = {
-                # Chunk genes
-                x <- self[[dataset.use]][, chunk.indices]
-                x[, indices.use]
-              },
-              '2' = {
-                # Chunk cells
-                x <- self[[dataset.use]][chunk.indices, ]
-                x[indices.use, ]
-              }
-            )
-          } else {
-            x <- self[[private$iter.datset]][chunk.indices]
-            x[indices.use]
-          }
-          chunk.data <- FUN(chunk.data, ...)
-          if (results.matrix) {
-            # If we're writign to a matrix
-            # Figure out which way we're writing the data
-            switch(
-              EXPR = MARGIN,
-              '1' = {
-                chunk.full <- matrix(
-                  nrow = nrow(x = chunk.data),
-                  ncol = length(x = chunk.indices)
-                )
-                chunk.full[, indices.use] <- chunk.data
-                group[[results.basename]][, chunk.indices] <- chunk.full
-                # group[[results.use]][, chunk.indices] <- chunk.full
-              },
-              '2' = {
-                chunk.full <- matrix(
-                  nrow = length(x = chunk.indices),
-                  ncol = ncol(x = chunk.data)
-                )
-                chunk.full[indices.use, ] <- chunk.data
-                group[[results.basename]][chunk.indices, ] <- chunk.full
-                # group[[results.use]][chunk.indices, ] <- chunk.full
-              }
-            )
-          } else {
-            # Just write to the vector
-            chunk.full <- vector(length = length(x = chunk.indices))
-            chunk.full[indices.use] <- chunk.data
-            group[[results.basename]][chunk.indices] <- chunk.full
-            # group[[results.use]][chunk.indices] <- chunk.full
+          if (length(x = indices.use) >= 1) {
+            # Get the data and apply FUN
+            chunk.data <- if (dataset.matrix) {
+              switch(
+                EXPR = MARGIN,
+                '1' = {
+                  # Chunk genes
+                  x <- self[[dataset.use]][, chunk.indices]
+                  x[, indices.use]
+                },
+                '2' = {
+                  # Chunk cells
+                  x <- self[[dataset.use]][chunk.indices, ]
+                  x[indices.use, ]
+                }
+              )
+            } else {
+              x <- self[[private$iter.datset]][chunk.indices]
+              x[indices.use]
+            }
+            chunk.data <- FUN(chunk.data, ...)
+            if (results.matrix) {
+              # If we're writign to a matrix
+              # Figure out which way we're writing the data
+              switch(
+                EXPR = MARGIN,
+                '1' = {
+                  chunk.full <- matrix(
+                    nrow = nrow(x = chunk.data),
+                    ncol = length(x = chunk.indices)
+                  )
+                  chunk.full[, indices.use] <- chunk.data
+                  group[[results.basename]][, chunk.indices] <- chunk.full
+                  # group[[results.use]][, chunk.indices] <- chunk.full
+                },
+                '2' = {
+                  chunk.full <- matrix(
+                    nrow = length(x = chunk.indices),
+                    ncol = ncol(x = chunk.data)
+                  )
+                  chunk.full[indices.use, ] <- chunk.data
+                  group[[results.basename]][chunk.indices, ] <- chunk.full
+                  # group[[results.use]][chunk.indices, ] <- chunk.full
+                }
+              )
+            } else {
+              # Just write to the vector
+              chunk.full <- vector(length = length(x = chunk.indices))
+              chunk.full[indices.use] <- chunk.data
+              group[[results.basename]][chunk.indices] <- chunk.full
+              # group[[results.use]][chunk.indices] <- chunk.full
+            }
           }
           gc(verbose = FALSE)
           return(NULL)
@@ -1228,29 +1227,28 @@ loom <- R6Class(
           chunk.indices <- start:end
           indices.use <- chunk.indices[chunk.indices %in% index.use]
           indices.use <- indices.use - chunk.indices[1] + 1
-          if (length(x = indices.use) < 1) {
-            next
+          if (length(x = indices.use) >= 1) {
+            # Get the data and apply FUN
+            chunk.data <- if (dataset.matrix) {
+              switch(
+                EXPR = MARGIN,
+                '1' = {
+                  # Chunk genes
+                  x <- self[[dataset.use]][, chunk.indices]
+                  x[, indices.use]
+                },
+                '2' = {
+                  # Chunk cells
+                  x <- self[[dataset.use]][chunk.indices, ]
+                  x[indices.use, ]
+                }
+              )
+            } else {
+              x <- self[[dataset.use]][chunk.indices]
+              x[indices.use]
+            }
+            results[[i]] <<- FUN(chunk.data, ...)
           }
-          # Get the data and apply FUN
-          chunk.data <- if (dataset.matrix) {
-            switch(
-              EXPR = MARGIN,
-              '1' = {
-                # Chunk genes
-                x <- self[[dataset.use]][, chunk.indices]
-                x[, indices.use]
-              },
-              '2' = {
-                # Chunk cells
-                x <- self[[dataset.use]][chunk.indices, ]
-                x[indices.use, ]
-              }
-            )
-          } else {
-            x <- self[[dataset.use]][chunk.indices]
-            x[indices.use]
-          }
-          results[[i]] <<- FUN(chunk.data, ...)
           return(NULL)
         },
         ...
@@ -2274,7 +2272,7 @@ combine <- function(
     ncols[i] <- this[['matrix']]$dims[1]
     matrix.type[[i]] <- class(x = this[['matrix']]$get_type())[1]
     # loom.chunk.dims[[i]] <- as.numeric(strsplit(h5attr(this, 'chunks'), split = '[\\(, \\)]+')[[1]][2:3])
-    loom.chunk.dims[[i]] <- lfile[['matrix']]$chunk_dims
+    loom.chunk.dims[[i]] <- this[['matrix']]$chunk_dims
     if (is.character(x = looms[[i]])) {
       this$close_all()
     }
