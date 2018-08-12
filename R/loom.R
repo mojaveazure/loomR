@@ -2245,6 +2245,11 @@ combine <- function(
           col.ndims[[attr]],
           length(x = this[[attr]]$dims)
         )
+        # I added this, since otherwise, the number of rows of 2D column attributes
+        # will be doubled
+        if (all(col.ndims[[attr]] == 2)) {
+          col.dims[[attr]] <- this[[attr]]$dims[1]
+        }
       }
     }
     layers <- unique(x = c(
@@ -2388,7 +2393,7 @@ combine <- function(
     gzip_level = 4
   )
   for (lay in layers) {
-    if (length(x = lay) > 1) {
+    #if (length(x = lay) > 1) {
       new.loom$create_dataset(
         name = lay,
         dtype = getDtype2(x = layers.types[[lay]]),
@@ -2396,7 +2401,7 @@ combine <- function(
         chunk_dims = chunk.dims,
         gzip_level = 4
       )
-    }
+    #}
   }
   for (attr in col.attrs) {
     if (length(x = attr) > 0) {
@@ -2453,8 +2458,8 @@ combine <- function(
           }
           next
         }
-        lay.add <- this[['layers']][[lay]][cells.use, ]
-        new.loom[['layers']][[lay]][cells.use + matrix.previous, ] <- lay.add[, order.genes]
+        lay.add <- this[[lay]][cells.use, ]
+        new.loom[[lay]][cells.use + matrix.previous, ] <- lay.add[, order.genes]
       }
       if (display.progress) {
         setTxtProgressBar(pb = pb, value = col / ncol(x = chunk.points))
@@ -2486,7 +2491,7 @@ combine <- function(
       } else {
         for (col in 1:ncol(x = chunk.points)) {
           col.use <- chunk.points[1, col]:chunk.points[2, col]
-          new.loom[[attr]][col.use, (start + 1):end] <- this[[attr]][col.use, ]
+          new.loom[[attr]][, col.use] <- this[[attr]][, col.use]
         }
       }
       if (display.progress) {
@@ -2513,7 +2518,7 @@ combine <- function(
           setTxtProgressBar(
             pb = pb,
             value = grep(
-              pattern = attr,
+              pattern = paste0("^", attr, "$"),
               x = list.datasets(object = this[['row_attrs']])
             ) / length(x = list.datasets(object = this[['row_attrs']]))
           )
