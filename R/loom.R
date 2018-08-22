@@ -2,6 +2,7 @@
 #' @import hdf5r
 #' @import Matrix
 #' @importFrom R6 R6Class
+#' @importFrom WGCNA transposeBigData
 NULL
 
 #' A class for connections loom files
@@ -145,13 +146,19 @@ NULL
 #'       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
 #'     }
 #'   }
-#'   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
+#'   \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, do.transpose = TRUE,
+#'   big.data = FALSE, display.progress = TRUE, ...)}}{
 #'     Add cells to a loom file.
 #'     \describe{
-#'       \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+#'       \item{\code{matrix.data}}{A matrix of m2 cells (columns) with n rows (num genes, \code{self$shape[1]}),
+#'       since this will be transposed (with \code{do.transpose = TRUE}), and to avoid transposing large datasets,
+#'       a matrix of m2 rows and n columns can also be accepted (with \code{do.transpose = FALSE}).}
 #'       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
 #'       \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+#'       \item{\code{do.transpose}}{Logical, indicates whether the matrix and layer data should be transposed before added to the loom object.}
+#'       \item{\code{big.data}}{Logical, indicates whether matrix and layer data should be transposed by chunks.}
 #'       \item{\code{display.progress}}{Display a progress bar}
+#'       \item{\code{...}}{Arguments to be passed to \code{WGCNA::transposeBigData}}
 #'     }
 #'   }
 #'   \item{\code{add.loom(other, other.key, self.key, ...)}}{
@@ -1268,7 +1275,12 @@ loom <- R6Class(
       matrix.data,
       attributes.data = NULL,
       layers.data = NULL,
-      display.progress = TRUE
+      # I added the do.transpose argument to remove the need to transpose matrix and layer data
+      # in case a lot of cells are added
+      do.transpose = TRUE,
+      big.data = FALSE,
+      display.progress = TRUE,
+      ...
     ) {
       if (self$mode == 'r') {
         stop(private$err_mode)
@@ -1278,11 +1290,12 @@ loom <- R6Class(
       if (display.progress) {
         cate("Checking inputs...")
       }
-      matrix.data <- check.matrix_data(x = matrix.data, n = n)
+      matrix.data <- check.matrix_data(x = matrix.data, n = n, do.transpose = do.transpose)
       layers.data <- check.layers(
         x = layers.data,
         n = n,
-        layers.names = names(x = self[['layers']])
+        layers.names = names(x = self[['layers']]),
+        do.transpose = do.transpose
       )
       matrices <- vapply(attributes.data, is.matrix, FUN.VALUE = logical(1L))
       attributes.data <- check.col_attrs(
@@ -1292,8 +1305,8 @@ loom <- R6Class(
       )
       # Get the number of cells we're adding
       num.cells <- c(
-        nCells.matrix_data(x = matrix.data),
-        nCells.layers(x = layers.data),
+        nCells.matrix_data(x = matrix.data, do.transpose = do.transpose),
+        nCells.layers(x = layers.data, do.transpose = do.transpose),
         nCells.col_attrs(x = attributes.data)
       )
       num.cells <- max(num.cells)
@@ -1301,8 +1314,10 @@ loom <- R6Class(
       if (display.progress) {
         cate(paste("Adding", num.cells, "to this loom file"))
       }
-      matrix.data <- addCells.matrix_data(x = matrix.data, n = n, m2 = num.cells)
-      layers.data <- addCells.layers(x = layers.data, n = n, m2 = num.cells)
+      matrix.data <- addCells.matrix_data(x = matrix.data, n = n, m2 = num.cells,
+                                          do.transpose = do.transpose)
+      layers.data <- addCells.layers(x = layers.data, n = n, m2 = num.cells,
+                                     do.transpose = do.transpose)
       attributes.data <- addCells.col_attrs(x = attributes.data, m2 = num.cells, matrices = matrices)
       # Add the input to the loom file
       dims.fill <- self[['matrix']]$dims[1]
@@ -1311,7 +1326,13 @@ loom <- R6Class(
       if (display.progress) {
         cate("Adding data to /matrix")
       }
-      matrix.data <- t(x = as.matrix(x = data.frame(matrix.data)))
+      if (do.transpose) {
+        if (big.data) {
+          matrix.data <- WGCNA::transposeBigData(matrix.data, ...)
+        } else {
+          matrix.data <- t(matrix.data)
+        }
+      }
       self[['matrix']][dims.fill, ] <- matrix.data
       # Layer data
       if (display.progress) {
@@ -1320,8 +1341,15 @@ loom <- R6Class(
         counter <- 0
       }
       layers.names <- names(x = self[['layers']])
+      if (do.transpose) {
+        if (big.data) {
+          layers.data <- lapply(layers.data, WGCNA::transposeBigData, ...)
+        } else {
+          layers.data <- lapply(layers.data, t)
+        }
+      }
       for (i in layers.names) {
-        self[['layers']][[i]][dims.fill, ] <- t(x = layers.data[[i]])
+        self[['layers']][[i]][dims.fill, ] <- layers.data[[i]]
         if (display.progress) {
           counter <- counter + 1
           setTxtProgressBar(pb = pb, value = counter / length(x = layers.names))

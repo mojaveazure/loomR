@@ -268,81 +268,87 @@ is.actual_vector <- function(x) {
 
 # Check additions to /matrix
 #
-# @param x A list of vectors to add to /matrix
+# @param x A matrix to add to /matrix
 # @param n The number of genes needed in each cell
 #
-# @return 'x' as a list of vectors
+# @return 'x' as a matrix
 #
-check.matrix_data <- function(x, n) {
-  # Coerce x into a list, where each
-  # entry in the list is a new cell added
-  if (is.actual_vector(x = x)) {
-    x <- list(x)
-  } else if (is.matrix(x = x) || is.data.frame(x = x)) {
-    x <- as.list(x = x)
+check.matrix_data <- function(x, n, do.transpose) {
+  if (!is.matrix(x)) {
+    stop("Matrix data must be a matrix")
   }
-  if (!is.list(x = x)) {
-    stop("Matrix data must be a list of vectors")
+  # Check number of genes
+  if (do.transpose) {
+    n_genes <- nrow(x)
+  } else {
+    n_genes <- ncol(x)
   }
-  # Ensure that each entry in the list is a vector of length n
-  vector.check <- vapply(
-    X = x,
-    FUN = is.actual_vector,
-    FUN.VALUE = logical(length = 1L)
-  )
-  if (!all(vector.check)) {
-    stop('Each new cell added must be represented as a vector')
-  }
-  # Ensure each new cell added has data for the number of genes present
-  for (i in 1:length(x = x)) {
-    cell.add <- x[[i]]
-    if (length(x = cell.add) > n) {
-      stop(paste(
-        "Cannot add genes to a loom file, the maximum number of genes allowed is",
-        n
-      ))
-    } else if (length(x = cell.add) < n) {
-      cell.add[(length(x = cell.add) + 1):n] <- NA
+  if (n_genes > n) {
+    stop(paste(
+      "Cannot add genes to a loom file, the maximum number of genes allowed is",
+      n
+    ))
+  } else if (n_genes < n) {
+    # Add NAs to fill in genes absent in matrix data to be added
+    if (do.transpose) {
+      # Genes are rows
+      x <- rbind(x, matrix(NA, nrow = n - n_genes, ncol = ncol(x)))
+    } else {
+      # Genes are columns
+      x <- cbind(x, matrix(NA, nrow = nrow(x), ncol = n - n_genes))
     }
-    x[[i]] <- cell.add
+    message(paste0("Filled in data for ", n - n_genes, " genes with NA's"))
   }
   return(x)
 }
 
-# Get the number of cells being added to /matrix
-#
-# @param x A list of vectors to add to /matrix
-#
-# @return The number of cells in x
-#
-nCells.matrix_data <- function(x) {
-  return(length(x = x))
+#' Get the number of cells being added to /matrix
+#'
+#' @param x A matrix to add to /matrix.
+#' @param do.transpose Logical, whether the matrix data should be transposed before
+#' added to the loom object.
+#' @return The number of cells in x.
+#'
+nCells.matrix_data <- function(x, do.transpose) {
+  if (do.transpose) {
+    return(ncol(x))
+  } else {
+    return(nrow(x))
+  }
 }
 
-# Add missing cells to data added to /matrix
-#
-# @param x A list of vectors to add to /matrix
-# @param n The number of genes each cell needs
-# @param m2 The number of cells being added to the loom file
-#
-# @return 'x' with the proper number of cells
-#
-addCells.matrix_data <- function(x, n, m2) {
-  if (length(x = x) < m2) {
-    x[(length(x = x) + 1):m2] <- list(rep.int(x = NA, times = n))
+#' Add missing cells to data added to /matrix
+#'
+#' @param x A matrix to add to /matrix.
+#' @param n The number of genes each cell needs.
+#' @param m2 The number of cells being added to the loom file.
+#' @param do.transpose Logical, whether the matrix data should be transposed before
+#' added to the loom object.
+#' @return 'x' with the proper number of cells.
+#'
+addCells.matrix_data <- function(x, n, m2, do.transpose) {
+  if (do.transpose) {
+    if (ncol(x) < m2) {
+      x <- cbind(x, matrix(NA, nrow = n, ncol = m2 - ncol(x)))
+    }
+  } else {
+    if (nrow(x) < m2) {
+      x <- rbind(x, matrix(NA, nrow = m2 - nrow(x), ncol = n))
+    }
   }
   return(x)
 }
 
-# Check additions to /layers
-#
-# @param x A list of matrices to add layers in /layers
-# @param n The number of genes needed for each layer
-# @param layers.names Names found in /layers
-#
-# @return 'x' as a list of matricies with 'n' rows for each layer present in /layers
-#
-check.layers <- function(x, n, layers.names) {
+#' Check additions to /layers
+#'
+#' @param x A list of matrices to add layers in /layers.
+#' @param n The number of genes needed for each layer.
+#' @param layers.names Names found in /layers.
+#' @param do.transpose Logical, whether the matrix data should be transposed before
+#' added to the loom object.
+#' @return 'x' as a list of matricies with 'n' rows for each layer present in /layers
+#'
+check.layers <- function(x, n, layers.names, do.transpose) {
   # Coerce x into a list of matricies
   if (is.null(x = x)) {
     x <- list()
@@ -362,7 +368,11 @@ check.layers <- function(x, n, layers.names) {
   if (length(x = x) > length(x = layers.names)) {
     stop("Cannot add more layers than already present")
   } else if (length(x = x) < length(x = layers.names)) {
-    x[(length(x = x) + 1):length(x = layers.names)] <- data.frame(rep.int(x = NA, times = n))
+    if (do.transpose) {
+      x[(length(x = x) + 1):length(x = layers.names)] <- matrix(NA, nrow = n, ncol = 1)
+    } else {
+      x[(length(x = x) + 1):length(x = layers.names)] <- matrix(NA, nrow = 1, ncol = n)
+    }
   }
   # Ensure that we have all genes needed
   for (i in 1:length(x = x)) {
@@ -370,20 +380,35 @@ check.layers <- function(x, n, layers.names) {
     if (is.data.frame(x = layer)) {
       layer <- as.matrix(x = layer)
     } else if (is.actual_vector(x = layer)) {
-      layer <- matrix(data = layer, ncol = 1)
+      if (do.transpose) {
+        layer <- matrix(data = layer, ncol = 1)
+      } else {
+        layer <- matrix(data = layer, nrow = 1)
+      }
     }
     if (!is.matrix(x = layer)) {
       stop("Layers data must be a list of matrices")
     }
-    if (nrow(x = layer) > n) {
+    if (do.transpose) {
+      n_genes <- nrow(layer)
+    } else {
+      n_genes <- ncol(layer)
+    }
+    if (n_genes > n) {
       stop(paste(
         "Cannot add genes to a loom file, the maximum number of genes allowed is",
         n
       ))
-    } else if (nrow(x = layer) < n) {
-      layer <- as.data.frame(x = layer)
-      layer[(nrow(x = layer) + 1):n, ] <- NA
-      layer <- as.matrix(x = layer)
+    } else if (n_genes < n) {
+      # Add NAs to fill in genes absent in matrix data to be added
+      if (do.transpose) {
+        # Genes are rows
+        layer <- rbind(layer, matrix(NA, nrow = n - n_genes, ncol = ncol(layer)))
+      } else {
+        # Genes are columns
+        layer <- cbind(layer, matrix(NA, nrow = nrow(layer), ncol = n - n_genes))
+      }
+      message(paste0("Filled in layer ", names(x)[i], " for ", n - n_genes, " genes with NA's"))
     }
     x[[i]] <- layer
   }
@@ -397,32 +422,43 @@ check.layers <- function(x, n, layers.names) {
   return(x)
 }
 
-# Get the number of cells being added to /layers
-#
-# @param x A list of matricies to add to /layers
-#
-# @return The number of cells within each matrix
-#
-nCells.layers <- function(x) {
-  return(vapply(X = x, FUN = ncol, FUN.VALUE = integer(length = 1L)))
+#' Get the number of cells being added to /layers
+#'
+#' @param x A list of matricies to add to /layers.
+#' @param do.transpose Logical, whether the matrix data should be transposed before
+#' added to the loom object.
+#' @return The number of cells within each matrix.
+#'
+nCells.layers <- function(x, do.transpose) {
+  if (do.transpose) {
+    return(vapply(X = x, FUN = ncol, FUN.VALUE = integer(length = 1L)))
+  } else {
+    return(vapply(X = x, FUN = nrow, FUN.VALUE = integer(length = 1L)))
+  }
+
 }
 
-# Add missing cells to data added to /matrix
-#
-# @param x A list of matricies to add to /layers
-# @param n The number of genes each cell needs
-# @param m2 The number of cells being added to the loom file
-#
-# @return 'x' with the proper number of cells
-#
-addCells.layers <- function(x, n, m2) {
-  layers.extend <- vapply(X = x, FUN = ncol, FUN.VALUE = integer(length = 1L))
+#' Add missing cells to data added to /matrix
+#'
+#' @param x A list of matricies to add to /layers.
+#' @param n The number of genes each cell needs.
+#' @param m2 The number of cells being added to the loom file.
+#' @param do.transpose Logical, whether the matrix data should be transposed before
+#' added to the loom object.
+#'
+#' @return 'x' with the proper number of cells
+#'
+addCells.layers <- function(x, n, m2, do.transpose) {
+  layers.extend <- nCells.layers(x, do.transpose)
   layers.extend <- which(x = layers.extend != m2)
   for (i in layers.extend) {
     layer <- x[[i]]
-    layer.new <- matrix(nrow = n, ncol = m2)
-    layer.new[, 1:ncol(x = layer)] <- layer
-    x[[i]] <- layer.new
+    if (do.transpose) {
+      layer <- cbind(layer, matrix(NA, nrow = n, ncol = m2 - ncol(layer)))
+    } else {
+      layer <- rbind(layer, matrix(NA, nrow = m2 - nrow(layer), ncol = n))
+    }
+    x[[i]] <- layer
     gc(verbose = FALSE)
   }
   return(x)
