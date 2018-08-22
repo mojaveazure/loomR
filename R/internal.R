@@ -389,9 +389,9 @@ check.layers <- function(x, n, layers.names) {
   }
   # Set names
   x.unnamed <- which(x = !(names(x = x) %in% layers.names))
-  if (length(x = x.unnamed) == 0) {
-    x.unnamed <- 1:length(x = x)
-  }
+  #if (length(x = x.unnamed) == 0) {
+  #  x.unnamed <- 1:length(x = x)
+  #}
   names.unused <- which(x = !(layers.names %in% names(x = x)))
   names(x = x)[x.unnamed] <- layers.names[names.unused]
   return(x)
@@ -430,12 +430,13 @@ addCells.layers <- function(x, n, m2) {
 
 # Check additions to /col_attrs
 #
-# @param x A list of vectors to add to /col_attrs
-# @param attrs.names Names of attributes found in /col_attrs
-#
+# @param x A list of vectors or matrices to add to /col_attrs
+# @param obj Names of attributes found in /col_attrs
+# @param matrices Logical indices of which column attributes are matrics rather than simple evtors
 # @return 'x' as a list of vectors for each attribute found in /col_attrs
 #
-check.col_attrs <- function(x, attrs.names) {
+check.col_attrs <- function(x, obj, matrices) {
+  attrs.names <- names(obj[["col_attrs"]])
   # Coerce x into a list of vectors
   if (is.null(x = x)) {
     x <- list()
@@ -445,7 +446,7 @@ check.col_attrs <- function(x, attrs.names) {
     x <- as.list(x = x)
   }
   if (!is.list(x = x)) {
-    stop("Attribute data must be a list of vectors")
+    stop("Attribute data must be a list")
   }
   # Ensure we have enough attribute additions for each col_attr
   # Manage named lists, taking only those with the same name as in /col_attrs
@@ -459,14 +460,25 @@ check.col_attrs <- function(x, attrs.names) {
   } else if (length(x = x) < length(x = attrs.names)) {
     x[(length(x = x) + 1):length(x = attrs.names)] <- NA
   }
-  if (!all(vapply(X = x, FUN = is.actual_vector, FUN.VALUE = logical(length = 1L)))) {
-    stop("Attribute data must be a list of vectors")
+  actual_vectors <- vapply(X = x, FUN = is.actual_vector, FUN.VALUE = logical(length = 1L))
+  # Allow matrices to support 2D column attributes
+  if (!all(actual_vectors | matrices)) {
+    stop("Attribute data must be a list of vectors and/or matrices")
+  }
+  # Check that all 2D column attributes have the right number of rows
+  if (any(matrices)) {
+    names_matrices <- intersect(names(x)[matrices], attrs.names)
+    for (y in names_matrices) {
+      if (nrow(x[[y]]) != obj[[paste0("col_attrs/", y)]]$dims[1]) {
+        stop("2D column attributes must have the same number of rows")
+      }
+    }
   }
   # Set names
   x.unnamed <- which(x = !(names(x = x) %in% attrs.names))
-  if (length(x = x.unnamed) == 0) {
-    x.unnamed <- 1:length(x = x)
-  }
+  #if (length(x = x.unnamed) == 0) {
+  #  x.unnamed <- 1:length(x = x)
+  #}
   names.unused <- which(x = !(attrs.names %in% names(x = x)))
   names(x = x)[x.unnamed] <- attrs.names[names.unused]
   return(x)
@@ -479,22 +491,45 @@ check.col_attrs <- function(x, attrs.names) {
 # @return The number of cells for each attribute
 #
 nCells.col_attrs <- function(x) {
-  return(vapply(X = x, FUN = length, FUN.VALUE = integer(length = 1L)))
+  return(vapply(X = x,
+                FUN = function(y) {
+                  if (is.matrix(y)) {
+                    ncol(y)
+                  } else {
+                    length(y)
+                  }
+                },
+                FUN.VALUE = integer(length = 1L)))
 }
 
 # Add missing cells to data added to /col_attrs
 #
 # @param x A list of vectors to add to /col_attrs
 # @param m2 The number of cells being added to the loom file
-#
+# @param matrices Logical vector indicating which column attribtes are matrices
 # @return 'x' with the proper number of cells
 #
-addCells.col_attrs <- function(x, m2) {
-  attrs.extend <- vapply(X = x, FUN = length, FUN.VALUE = integer(length = 1L))
-  attrs.extend <- which(x = attrs.extend != m2)
-  for (i in attrs.extend) {
+addCells.col_attrs <- function(x, m2, matrices) {
+  # Make it support 2D column attributes
+  attrs.extend <- nCells.col_attrs(x)
+  ind.extend <- attrs.extend != m2
+  ind.extend.vecs <- which(ind.extend & !matrices)
+  ind.extend.mats <- which(ind.extend & matrices)
+  for (i in ind.extend.mats) {
     attr <- x[[i]]
-    attr <- c(attr, rep.int(x = NA, times = m2 - length(x = attr)))
+    # For 2 dimensional column attributes
+    # Fill with NA when not enough columns are present
+    attr <- cbind(attr, matrix(nrow = nrow(attr), ncol = m2 - attrs.extend[i]))
+    message(paste0("In column attribute ", names(x)[i],
+                   ": Not enough columns; ", m2 - attrs.extend[i], "columns of NA's appended."))
+    x[[i]] <- attr
+  }
+  for (i in ind.extend.vecs) {
+    attr <- x[[i]]
+    # For 1 dimensional column attributes
+    attr <- c(attr, rep.int(x = NA, times = m2 - attrs.extend[i]))
+    message(paste0("In column attribute ", names(x)[i],
+                   ": Not enough entries; ", m2 - attrs.extend[i], "NA's appended."))
     x[[i]] <- attr
   }
   return(x)

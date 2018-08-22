@@ -1284,9 +1284,11 @@ loom <- R6Class(
         n = n,
         layers.names = names(x = self[['layers']])
       )
+      matrices <- vapply(attributes.data, is.matrix, FUN.VALUE = logical(1L))
       attributes.data <- check.col_attrs(
         x = attributes.data,
-        attrs.names = names(x = self[['col_attrs']])
+        obj = self,
+        matrices = matrices
       )
       # Get the number of cells we're adding
       num.cells <- c(
@@ -1301,7 +1303,7 @@ loom <- R6Class(
       }
       matrix.data <- addCells.matrix_data(x = matrix.data, n = n, m2 = num.cells)
       layers.data <- addCells.layers(x = layers.data, n = n, m2 = num.cells)
-      attributes.data <- addCells.col_attrs(x = attributes.data, m2 = num.cells)
+      attributes.data <- addCells.col_attrs(x = attributes.data, m2 = num.cells, matrices = matrices)
       # Add the input to the loom file
       dims.fill <- self[['matrix']]$dims[1]
       dims.fill <- (dims.fill + 1L):(dims.fill + num.cells)
@@ -1332,8 +1334,13 @@ loom <- R6Class(
         counter <- 0
       }
       attrs.names <- names(x = self[['col_attrs']])
+      names(matrices) <- attrs.names
       for (i in attrs.names) {
-        self[['col_attrs']][[i]][dims.fill] <- attributes.data[[i]]
+        if (matrices[i]) {
+          self[["col_attrs"]][[i]][,dims.fill] <- attributes.data[[i]]
+        } else {
+          self[['col_attrs']][[i]][dims.fill] <- attributes.data[[i]]
+        }
         if (display.progress) {
           counter <- counter + 1
           setTxtProgressBar(pb = pb, value = counter / length(x = attrs.names))
