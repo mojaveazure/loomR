@@ -1364,9 +1364,23 @@ loom <- R6Class(
       attrs.names <- names(x = self[['col_attrs']])
       for (i in attrs.names) {
         if (matrices[i]) {
-          self[["col_attrs"]][[i]][,dims.fill] <- attributes.data[[i]]
+          if (is.infinite(self[["col_attrs"]][[i]]$maxdims[2])) {
+            self[["col_attrs"]][[i]][,dims.fill] <- attributes.data[[i]]
+          } else {
+            this_attr <- self[["col_attrs"]][[i]][,]
+            this_attr <- list(cbind(this_attr, attributes.data[[i]]))
+            names(this_attr) <- i
+            self$add.col.attribute(this_attr, overwrite = TRUE)
+          }
         } else {
-          self[['col_attrs']][[i]][dims.fill] <- attributes.data[[i]]
+          if (is.infinite(self[["col_attrs"]][[i]]$maxdims)) {
+            self[['col_attrs']][[i]][dims.fill] <- attributes.data[[i]]
+          } else {
+            this_attr <- self[["col_attrs"]][[i]][]
+            this_attr <- list(c(this_attr, attributes.data[[i]]))
+            names(this_attr) <- i
+            self$add.col.attribute(this_attr, overwrite = TRUE)
+          }
         }
         if (display.progress) {
           counter <- counter + 1
