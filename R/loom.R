@@ -1362,7 +1362,6 @@ loom <- R6Class(
         counter <- 0
       }
       attrs.names <- names(x = self[['col_attrs']])
-      names(matrices) <- attrs.names
       for (i in attrs.names) {
         if (matrices[i]) {
           self[["col_attrs"]][[i]][,dims.fill] <- attributes.data[[i]]
@@ -1374,6 +1373,8 @@ loom <- R6Class(
           setTxtProgressBar(pb = pb, value = counter / length(x = attrs.names))
         }
       }
+      # Update self$shape
+      self$shape[] <- self$matrix$dims[2:1]
       # # Load layers and attributes
       # private$load_layers()
       # private$load_attributes(MARGIN = 1)
