@@ -153,13 +153,19 @@ A class for connections loom files
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
-  \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
+  \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, do.transpose = TRUE,
+  big.data = FALSE, display.progress = TRUE, ...)}}{
     Add cells to a loom file.
     \describe{
-      \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+      \item{\code{matrix.data}}{A matrix of m2 cells (columns) with n rows (num genes, \code{self$shape[1]}),
+      since this will be transposed (with \code{do.transpose = TRUE}), and to avoid transposing large datasets,
+      a matrix of m2 rows and n columns can also be accepted (with \code{do.transpose = FALSE}).}
       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
       \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
+      \item{\code{do.transpose}}{Logical, indicates whether the matrix and layer data should be transposed before added to the loom object.}
+      \item{\code{big.data}}{Logical, indicates whether matrix and layer data should be transposed by chunks.}
       \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{...}}{Arguments to be passed to \code{WGCNA::transposeBigData}}
     }
   }
   \item{\code{add.loom(other, other.key, self.key, ...)}}{
