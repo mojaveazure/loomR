@@ -1388,7 +1388,7 @@ loom <- R6Class(
         }
       }
       # Update self$shape
-      self$shape[] <- self$matrix$dims[2:1]
+      self$update.shape()
       # # Load layers and attributes
       # private$load_layers()
       # private$load_attributes(MARGIN = 1)
