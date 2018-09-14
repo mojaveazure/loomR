@@ -834,9 +834,7 @@ validateLoom <- function(object) {
     paste(required.groups, collapse = "', '"),
     "'"
   )
-  if (length(x = root.groups) != 2) {
-    stop(group.msg)
-  }
+ 
   if (!all(required.groups %in% root.groups)) {
     stop(group.msg)
   }
