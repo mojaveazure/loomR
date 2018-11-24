@@ -1,3 +1,23 @@
+# Copyright 2017 Rahul Satija <rsatija@nygenome.org>
+# Copyright 2017, 2018 Andrew Butler <andrew.butler33@gmail.com>
+# Copyright 2017, 2018 Paul Hoffman <phoffman@nygenome.org>
+# Copyright 2018 Christoph Hafemeister <chafemeister@nygenome.org>
+#
+# This file is part of loomR.
+#
+# loomR is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# loomR is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with loomR.  If not, see <https://www.gnu.org/licenses/>.
+
 #' @include internal.R
 #' @import hdf5r
 #' @import Matrix
