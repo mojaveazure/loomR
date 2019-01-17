@@ -471,7 +471,19 @@ loom <- R6Class(
       # Add the attributes as datasets for our MARGIN's group
       for (i in 1:length(x = attribute)) {
         try(expr = grp$link_delete(name = names(x = attribute)[i]), silent = TRUE)
-        grp[[names(x = attribute)[i]]] <- attribute[[i]]
+
+        if(is.null(dim(attribute[[i]]))){
+          message(paste("Adding :",names(x = attribute)[i]))
+          att = grp$create_dataset(
+                     name = names(x = attribute)[i],
+                     dtype = getDtype(x = attribute[[i]]),
+                     dims = length(attribute[[i]])
+                 )
+
+          att[1:length(attribute[[i]])] = attribute[[i]]
+        } else{
+          grp[[names(x = attribute)[i]]] <- attribute[[i]] 
+        }               
       }
       self$flush()
       gc(verbose = FALSE)

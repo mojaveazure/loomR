@@ -57,7 +57,7 @@ getDtype <- function(x) {
     EXPR = class(x = x),
     'numeric' = h5types$double,
     'integer' = h5types$int,
-    'character' = H5T_STRING$new(size = Inf),
+    'character' = H5T_STRING$new(size = max(nchar(x))),
     'logical' = H5T_LOGICAL$new(),
     stop(paste("Unknown data type:", class(x = x)))
   ))
