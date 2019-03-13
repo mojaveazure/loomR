@@ -540,8 +540,8 @@ loom <- R6Class(
 
           att[1:length(attribute[[i]])] = attribute[[i]]
         } else{
-          grp[[names(x = attribute)[i]]] <- attribute[[i]] 
-        }               
+          grp[[names(x = attribute)[i]]] <- attribute[[i]]
+        }
       }
       self$flush()
       gc(verbose = FALSE)
@@ -1924,6 +1924,9 @@ subset.loom <- function(
     catn("Writing new loom file to", filename)
   }
   new.loom <- loom$new(filename = filename, mode = mode)
+  for (group in c('layers', 'row_attrs', 'col_attrs', 'row_graphs', 'col_graphs')) {
+    new.loom$create_group(name = group)
+  }
   # Add /matrix
   matrix.dims <- c(length(x = m), length(x = n))
   new.loom$create_dataset(
