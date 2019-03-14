@@ -29,8 +29,8 @@ Collate:
   'internal.R'
   'loom.R'
   'package.R'
-License: GPL-3
+License: DBAD
 Encoding: UTF-8
 LazyData: true
 SystemRequirements: HDF5 (>= 1.8.13)
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
