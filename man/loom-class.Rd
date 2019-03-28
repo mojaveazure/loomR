@@ -17,15 +17,15 @@ A class for connections loom files
 \describe{
 \item{\code{version}}{Version of loomR object was created under}
 
-\item{\code{shape}}{Shape of \code{/matrix} in genes (columns) by cells (rows)}
+\item{\code{shape}}{Shape of \code{/matrix} in features (columns) by cells (rows)}
 
-\item{\code{matrix}}{The main data matrix, stored as columns (cells) by rows (genes)}
+\item{\code{matrix}}{The main data matrix, stored as columns (cells) by rows (features)}
 
 \item{\code{layers}}{Additional data matricies, the same shape as \code{/matrix}}
 
 \item{\code{col.attrs}}{Extra information about cells}
 
-\item{\code{row.attrs}}{Extra information about genes}
+\item{\code{row.attrs}}{Extra information about features}
 }}
 
 \section{Methods}{
@@ -45,30 +45,29 @@ A class for connections loom files
       \item{\code{overwrite}}{Can overwrite existing graph?}
     }
   }
-  \item{\code{add.layer(layer, chunk.size, overwrite)}}{
+  \item{\code{add.layer(layers, overwrite)}}{
     Add a data layer to this loom file, must be the same dimensions as \code{/matrix}
     \describe{
-      \item{\code{layer}}{A named list of matrices to be added as layers}
-      \item{\code{chunk.size}}{Number of rows from each layer to stream at once, defaults to 1000}
+      \item{\code{layers}}{A named list of matrices to be added as layers}
       \item{\code{overwrite}}{If a layer already exists, overwrite with new data, defaults to FALSE}
     }
   }
   \item{\code{add.attribute(attribute, MARGIN, overwrite)}}{
     Add extra information to this loom file.
     \describe{
-      \item{\code{attribute}}{A named list where the first dimmension of each element as long as one dimension of \code{/matrix}}
-      \item{\code{MARGIN}}{Either 1 for genes or 2 for cells}
+      \item{\code{attributes}}{A named list where the first dimmension of each element as long as one dimension of \code{/matrix}}
+      \item{\code{MARGIN}}{Either 1 for features or 2 for cells}
       \item{\code{overwrite}}{Can overwrite existing attributes?}
     }
   }
-  \item{\code{add.row.attribute(attribute), add.col.attribute(attribute)}}{
+  \item{\code{add.row.attribute(attributes), add.col.attribute(attributes)}}{
     Add row or column attributes
   }
-  \item{\code{get.attribute.df(MARGIN, attribute.names, row.names, col.names)}}{
+  \item{\code{get.attribute.df(MARGIN, attributes, row.names, col.names)}}{
     Get a group of row or column attributes as a data frame, will only return attributes that have one dimension
     \describe{
       \item{\code{MARGIN}}{Either '1' or '2' to get row- or column-attributes, respectively}
-      \item{\code{attribute.names}}{A vector of attribute dataset basenames}
+      \item{\code{attributes}}{A vector of attribute dataset basenames}
       \item{\code{row.names}}{Basename of the rownames dataset}
       \item{\code{col.names}}{Basename of the colnames dataset}
     }
@@ -83,83 +82,72 @@ A class for connections loom files
       }
     }
   }
-  \item{\code{get.sparse(dataset.use, genes.use, cells.use, chunk.size, gene.names, cell.names, display.progress)}}{
+  \item{\code{get.sparse(dataset, features, cells, chunk.size, feature.names, cell.names, verbose)}}{
     Get a sparse matrix representation of a dataset
     \describe{
-      \item{\code{dataset.use}}{Dataset to be returned as a sparse matrix}
-      \item{\code{genes.use}}{Vector of indices of genes to return}
-      \item{\code{cells.use}}{Vector of indices of cells to return}
+      \item{\code{dataset}}{Dataset to be returned as a sparse matrix}
+      \item{\code{features}}{Vector of indices of features to return}
+      \item{\code{cells}}{Vector of indices of cells to return}
       \item{\code{chunk.size}}{Number of cells to iterate through at a time}
-      \item{\code{gene.names}}{Dataset to gene names}
+      \item{\code{feature.names}}{Dataset to feature names}
       \item{\code{cell.names}}{Dataset to cell names}
-      \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{verbose}}{Display a progress bar}
     }
   }
-  \item{\code{chunk.points(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset.use = 'matrix')}}{
+  \item{\code{chunk.points(chunk.size = NULL, MARGIN = 2, dataset = 'matrix')}, \code{chunk.indices(chunk.size = NULL, MARGIN = 2, dataset = 'matrix')}}{
     Generate start/end points or indices of chunk size \code{chunk.size} for iteration
     \describe{
-      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset.use]]$chunk_dims}}
-      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
-      \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self[[dataset]]$chunk_dims}}
+      \item{\code{MARGIN}}{Iterate over features (1) or cells (2), defaults to 2}
+      \item{\code{dataset}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
     }
   }
-  \item{\code{scan(dataset.use = 'matrix', MARGIN = 2, chunk.size = NULL, index.use = NULL, display.progress = TRUE)}}{
+  \item{\code{scan(dataset = 'matrix', MARGIN = 2, chunk.size = NULL, index = NULL, verbose = TRUE)}}{
     Scan through a dataset
     \describe{
-      \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
+      \item{\code{dataset}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
-      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
-      \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
-      \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{MARGIN}}{Iterate over features (1) or cells (2), defaults to 2}
+      \item{\code{index}}{Which specific values of \code{dataset} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+      \item{\code{verbose}}{Display a progress bar}
     }
   }
-  \item{\code{batch.scan(chunk.size, MARGIN, index.use, dataset.use, force.reset)}, \code{batch.next(return.data)}}{
-    Scan a dataset in the loom file from \code{index.use[1]} to \code{index.use[2]}, iterating by \code{chunk.size}.
-    \describe{
-      \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
-      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
-      \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
-      \item{\code{dataset.use}}{Name of dataset to use, can be the name, not \code{group/name}, unless the name is present in multiple groups}
-      \item{\code{force.reset}}{Force a reset of the internal iterator}
-      \item{\code{return.data}}{Return data for a given chunk, if \code{FALSE}, returns the indices across \code{MARGIN} for said chunk}
-    }
-  }
-  \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset.use, overwrite, display.progress, ...)}}{
+  \item{\code{apply(name, FUN, MARGIN, chunk.size, dataset, overwrite, verbose, ...)}}{
     Apply a function over a dataset within the loom file, stores the results in the loom file. Will not make multidimensional attributes.
     \describe{
       \item{\code{name}}{Full name ('group/name') of dataset to store results to}
       \item{\code{FUN}}{Function to apply}
-      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
-      \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+      \item{\code{MARGIN}}{Iterate over features (1) or cells (2), defaults to 2}
+      \item{\code{index}}{Which specific values of \code{dataset} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
-      \item{\code{dataset.use}}{Name of dataset to use}
+      \item{\code{dataset}}{Name of dataset to use}
       \item{\code{overwrite}}{Overite \code{name} if already exists}
-      \item{\code{display.progress}}{Display progress}
+      \item{\code{verbose}}{Display progress}
       \item{\code{max.size}}{Maximum HDF5 chunk size}
       \item{\code{chunk.dims}}{HDF5 chunk dimensions}
-      \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{verbose}}{Display a progress bar}
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
-  \item{\code{map(FUN, MARGIN, chunk.size, index.use, dataset.use, display.progress, expected, ...)}}{
+  \item{\code{map(FUN, MARGIN, chunk.size, index, dataset, verbose, expected, ...)}}{
     Map a function onto a dataset within the loom file, returns the result into R.
     \describe{
       \item{\code{FUN}}{}
-      \item{\code{MARGIN}}{Iterate over genes (1) or cells (2), defaults to 2}
+      \item{\code{MARGIN}}{Iterate over features (1) or cells (2), defaults to 2}
       \item{\code{chunk.size}}{Size to chunk \code{MARGIN} by, defaults to \code{self$chunksize}}
-      \item{\code{index.use}}{Which specific values of \code{dataset.use} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
-      \item{\code{dataset.use}}{Name of dataset to use}
-      \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{index}}{Which specific values of \code{dataset} to use, defaults to \code{1:self$shape[MARGIN]} (all values)}
+      \item{\code{dataset}}{Name of dataset to use}
+      \item{\code{verbose}}{Display a progress bar}
       \item{\code{...}}{Extra parameters to pass to \code{FUN}}
     }
   }
-  \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, display.progress = TRUE)}}{
+  \item{\code{add.cells(matrix.data, attributes.data = NULL, layers.data = NULL, verbose = TRUE)}}{
     Add cells to a loom file.
     \describe{
-      \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num genes, \code{self$shape[1]})}
+      \item{\code{matrix.data}}{A list of m2 cells where each entry is a vector of length n (num features, \code{self$shape[1]})}
       \item{\code{attributes.data}}{A list where each entry is named for one of the datasets in \code{self[['col_attrs']]}; each entry is a vector of length m2.}
-      \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of genes in this loom file and m2 is the number of cells being added.}
-      \item{\code{display.progress}}{Display a progress bar}
+      \item{\code{layers.data}}{A list where each entry is named for one of the datasets in \code{self[['layers']]}; each entry is an n-by-m2 matrix where n is the number of features in this loom file and m2 is the number of cells being added.}
+      \item{\code{verbose}}{Display a progress bar}
     }
   }
   \item{\code{add.loom(other, other.key, self.key, ...)}}{

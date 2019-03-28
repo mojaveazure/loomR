@@ -6,14 +6,14 @@
 \title{Subset a loom file}
 \usage{
 \method{subset}{loom}(x, m = NULL, n = NULL, filename = NULL,
-  chunk.size = 1000, overwrite = FALSE, display.progress = TRUE, ...)
+  chunk.size = 1000, overwrite = FALSE, verbose = TRUE, ...)
 }
 \arguments{
 \item{x}{A loom object}
 
 \item{m}{Rows (cells) to subset, defaults to all rows}
 
-\item{n}{Columns (genes) to subset, defaults to all columns}
+\item{n}{Columns (features) to subset, defaults to all columns}
 
 \item{filename}{Filename for new loom object, defaults to ...}
 
@@ -21,7 +21,7 @@
 
 \item{overwrite}{Overwrite \code{filename} if already exists?}
 
-\item{display.progress}{Display a progress bar}
+\item{verbose}{Display a progress bar}
 
 \item{...}{Ignored for now}
 }

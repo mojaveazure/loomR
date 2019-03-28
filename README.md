@@ -1,5 +1,4 @@
 ![Travis](https://img.shields.io/travis/mojaveazure/loomR.svg?style=for-the-badge)
-[![forthebadge](https://forthebadge.com/images/badges/gluten-free.svg)](https://forthebadge.com)
 <!-- ![AppVeyor](https://img.shields.io/appveyor/ci/mojaveazure/loomR.svg?style=for-the-badge) -->
 <!-- ![CRAN](https://img.shields.io/cran/v/loomR.svg?style=for-the-badge) -->
 
@@ -33,8 +32,6 @@ loomR depends on:
  - [R](https://cran.r-project.org/) v3.4.x
  - The [R6](https://cran.r-project.org/package=R6) package
  - The [hdf5r](https://cran.r-project.org/package=hdf5r) package
- - The [iterators](https://cran.r-project.org/package=iterators) package
- - The [itertools](https://cran.r-project.org/package=itertools) package
  - The HDF5 [C++ API](https://support.hdfgroup.org/HDF5/release/obtainsrc.html)
 
 To get the HDF5 C++ API, please see the table below:

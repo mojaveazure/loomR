@@ -2,29 +2,29 @@
 % Please edit documentation in R/loom.R
 \name{create}
 \alias{create}
-\title{Create a loom object}
+\title{Create a loom file}
 \usage{
-create(filename, data, gene.attrs = NULL, cell.attrs = NULL,
-  layers = NULL, do.transpose = TRUE, calc.numi = FALSE,
+create(filename, data, feature.attrs = NULL, cell.attrs = NULL,
+  layers = NULL, transpose = TRUE, calc.count = FALSE,
   max.size = "400mb", dtype = NULL, chunk.dims = NULL,
-  chunk.size = NULL, overwrite = FALSE, display.progress = TRUE, ...)
+  chunk.size = NULL, overwrite = FALSE, verbose = TRUE, ...)
 }
 \arguments{
 \item{filename}{The name of the new loom file}
 
-\item{data}{The data for \code{/matrix}. If cells are rows and genes are columns, set \code{do.transpose = FALSE}; otherwise, set \code{do.transpose = TRUE}}
+\item{data}{The data for \code{/matrix}. If cells are rows and features are columns, set \code{transpose = FALSE}; otherwise, set \code{transpose = TRUE}}
 
-\item{gene.attrs}{A named list of vectors with extra data for genes, each vector must be as long as the number of genes in \code{data}}
+\item{feature.attrs}{A named list of vectors with extra data for features, each vector must be as long as the number of features in \code{data}}
 
 \item{cell.attrs}{A named list of vectors with extra data for cells, each vector must be as long as the number of cells in \code{data}
-Will store in 'col_attrs/nUMI' and 'col_attrs/nGene', overwriting anything passed to \code{cel.attrs};}
+Will store in 'col_attrs/nUMI' and 'col_attrs/nFeature', overwriting anything passed to \code{cel.attrs};}
 
 \item{layers}{A named list of matrices to be added as layers}
 
-\item{do.transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has genes as rows and cells as columns}
+\item{transpose}{Transpose the input? Should be \code{TRUE} if \code{data} has features as rows and cells as columns}
 
-\item{calc.numi}{Calculate number of UMIs and genes expressed per cell?
-To set a custom threshold for gene expression, pass an integer value (eg. \code{calc.numi = 5} for a threshold of five counts per cell)}
+\item{calc.count}{Calculate number of UMIs and features expressed per cell?
+To set a custom threshold for feature expression, pass an integer value (eg. \code{calc.count = 5} for a threshold of five counts per cell)}
 
 \item{max.size}{Set maximum chunk size in terms of memory usage, unused if \code{chunk.dims} is set;
 may pass a character string (eg. \code{3gb}, \code{1200mb}) or exact value in bytes}
@@ -37,7 +37,7 @@ may pass a character string (eg. \code{3gb}, \code{1200mb}) or exact value in by
 
 \item{overwrite}{Overwrite an already existing loom file?}
 
-\item{display.progress}{Display a progress bar}
+\item{verbose}{Display a progress bar}
 
 \item{...}{Ignored for now}
 }
@@ -45,7 +45,23 @@ may pass a character string (eg. \code{3gb}, \code{1200mb}) or exact value in by
 A connection to a loom file
 }
 \description{
-Create a loom object
+Create a loom file from data in R. This function should be used instead of \code{loom$new} when creating a loom file.
+In order to create a loom file, this function will attempt to automatically format input data to fit the loom file specifications.
+}
+\details{
+Due to the underlying architechture of R compared to Python, loomR assumes that the input matrix has cells as columns and features as rows,
+and will transpose the input data to match the loom specification of cells as columns and features as rows. If you are providing an input
+matrix with **cells** as **rows** and **features** as **columns**, please pass \code{tranpose = FALSE} to ensure proper loom writing.
+
+loomR can calculate nCells and nFeatures, similar to Seurat, and store them in the correct location upon object creation. To enable this
+calculation, please pass \code{calc.count = TRUE}
+
+Several HDF5 attributes (not column- or row-attributes) are stored upon creation of a loom file. These are as follows:
+\describe{
+  \item{version}{Version of loomR object was created under}
+  \item{chunks}{Dimensions used for matrix chunking}
+  \item{LOOM_SPEC_VERSION}{Specification of loom that loomR is targeting}
+}
 }
 \seealso{
 \code{\link{loom}}

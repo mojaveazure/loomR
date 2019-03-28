@@ -30,15 +30,15 @@ produced by the authors.
 Loom files are an HDF5-based format for storing and interacting with large single-cell RNAseq datasets.
 Each loom file has at least six parts to it:
 the raw expression data (\code{matrix}),
-groups for gene- and cell-metadata (\code{row_attrs} and \code{col_attrs}, respectively),
-groups for gene-based and cell-based cluster graphs (\code{row_graphs} and \code{col_graphs}, respectively),
+groups for feature- and cell-metadata (\code{row_attrs} and \code{col_attrs}, respectively),
+groups for feature-based and cell-based cluster graphs (\code{row_graphs} and \code{col_graphs}, respectively),
 and \code{layers}, a group containing alternative representations of the data in \code{matrix}.
 Each dataset within the loom file has rules as to what size it may be, creating a structure for the entire loom file and all the data within.
 This structure is enforced to ensure that data remains intact and retriveable when spread across the various datasets in the loom file.
 
 \describe{
   \item{\code{matrix}}{
-    The dataset that sets the dimensions for most other datasets within a loom file. This dataset has 'n' genes and 'm' cells.
+    The dataset that sets the dimensions for most other datasets within a loom file. This dataset has 'n' features and 'm' cells.
     Due to the way that loomR presents data, this will appear as 'm' rows and 'n' columns. However, other HDF5 libraries will
     generally present the data as 'n' rows and 'm' columns
   }
@@ -72,7 +72,7 @@ initializes the iterator and \code{batch.next} moves through the iterator.
 
 The \code{batch.scan} method will break a dataset in the loom file into chunks, based on a chunk size given to it. \code{batch.scan} will
 work on any dataset, except for two-dimensional attributes and any graph dataset. When iterating over \code{matrix} and the layers, the \code{MARGIN}
-argument tells the \code{loom} object which way to chunk the data. A \code{MARGIN} of 1 will chunk over genes while a \code{MARGIN} of 2 will chunk
+argument tells the \code{loom} object which way to chunk the data. A \code{MARGIN} of 1 will chunk over features while a \code{MARGIN} of 2 will chunk
 over cells. For one-dimmensional attributes, \code{MARGIN} is ignored. \code{batch.scan} returns an integer whose length is the number of iterations
 it takes to iterate over the dataset selected.
 
@@ -154,7 +154,7 @@ one needs the specific features of R6 classes or S4-style methods.
     UseMethod('somefunction', object)
   }
 
-  #' @export somefunction.loom
+  #' @export somefunction
   #' @method somefunction loom
   somefunction.loom <- function(object, loom.param, ...) {
     # do something
