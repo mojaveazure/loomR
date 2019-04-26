@@ -2183,7 +2183,7 @@ combine <- function(
   }
   # Check for the row attribute to order by
   if (!is.null(x = order.by)) { # We have something to order by
-    if (!grepl(pattern = order.by, x = row.attrs)) { # Check to ensure that the order.by is in each of our row attributes
+    if (!any(grepl(pattern = order.by, x = row.attrs))) { # Check to ensure that the order.by is in each of our row attributes
       stop("Cannot find '", order.by, "' in the row attributes for the loom files provided")
     } else {
       # If it is, get the values to order by
